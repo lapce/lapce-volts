@@ -1,8 +1,12 @@
 use async_session::{MemoryStore, SessionStore};
-use axum::{extract::State, response::IntoResponse, TypedHeader};
+use axum::{extract::State, response::IntoResponse, Json, TypedHeader};
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
+use serde_json::json;
 
-use crate::{db::models::User, state::SESSION_COOKIE_NAME};
+use crate::{
+    db::models::{ApiToken, User},
+    state::SESSION_COOKIE_NAME,
+};
 
 pub async fn list(
     State(store): State<MemoryStore>,
@@ -19,4 +23,8 @@ pub async fn list(
 
     let mut conn = db_pool.get().await.unwrap();
     let user = User::find(&mut conn, user_id).await.unwrap();
+    let tokens = ApiToken::list(&mut conn, &user).await.unwrap();
+    Json(json!({
+        "api_tokens": tokens,
+    }))
 }

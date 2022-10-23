@@ -1,16 +1,16 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
+use diesel::BelongingToDsl;
 use diesel::ExpressionMethods;
 use diesel::QueryDsl;
-use diesel::BelongingToDsl;
 use diesel_async::RunQueryDsl;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 
-use super::models::User;
-use super::schema::users;
 use super::models::ApiToken;
+use super::models::User;
 use super::schema::api_tokens;
+use super::schema::users;
 
 pub fn new_db_pool() -> Pool<AsyncPgConnection> {
     let manager = diesel_async::pooled_connection::AsyncDieselConnectionManager::new(
@@ -21,7 +21,7 @@ pub fn new_db_pool() -> Pool<AsyncPgConnection> {
 
 /// Represents a new user record insertable to the `users` table
 #[derive(Insertable, Debug, Default)]
-#[table_name = "users"]
+#[diesel(table_name = users)]
 pub struct NewUser<'a> {
     pub gh_id: i32,
     pub gh_login: &'a str,
