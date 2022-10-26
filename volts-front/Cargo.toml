@@ -10,7 +10,6 @@ gloo-net = "0.2.4"
 web-sys = "0.3.60"
 wasm-bindgen = "0.2.83"
 wasm-bindgen-futures = "0.4.33"
-yew = "0.19.3"
 gloo-timers = { version = "0.2.3", features = ["futures"] }
 console_error_panic_hook = "0.1.7"
 sycamore = { version = "0.8.2", features = ["suspense"] }

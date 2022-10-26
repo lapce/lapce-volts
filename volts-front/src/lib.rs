@@ -8,36 +8,10 @@ use sycamore::prelude::view;
 use sycamore::reactive::{create_signal, provide_context_ref};
 use sycamore::{reactive::Scope, view::View, web::Html};
 use volts_core::MeUser;
-use yew::{function_component, html, use_state, ContextProvider};
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct AppContext {
     pub login: Option<String>,
-}
-
-#[function_component(App)]
-fn app() -> Html {
-    let ctx = use_state(|| AppContext { login: None });
-    let initiated = use_state(|| false);
-    if !(*initiated) {
-        initiated.set(true);
-        let ctx = ctx.clone();
-        let req = Request::get("/api/v1/me").send();
-        wasm_bindgen_futures::spawn_local(async move {
-            let resp = req.await.unwrap();
-            let resp: MeUser = resp.json().await.unwrap();
-            let mut new_ctx = (*ctx).clone();
-            new_ctx.login = Some(resp.login);
-            ctx.set(new_ctx);
-        });
-    }
-
-    html! {
-        // <ContextProvider<AppContext> context={(*ctx).clone()}>
-        //     // <Navbar />
-        //     // <TokenList />
-        // </ContextProvider<AppContext>>
-    }
 }
 
 #[component]
