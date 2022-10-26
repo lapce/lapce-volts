@@ -71,7 +71,7 @@ impl AppState {
         );
         let store = MemoryStore::new();
         let github_client = GithubClient::new();
-        let db_pool = crate::db::api::new_db_pool();
+        let db_pool = crate::db::new_db_pool();
         Self {
             store,
             github_oauth,

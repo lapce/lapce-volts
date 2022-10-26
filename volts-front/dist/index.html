@@ -1,0 +1,39 @@
+<!DOCTYPE html><html><head>
+    <title>Yew App</title>
+	<link rel="stylesheet" href="/assets/tailwind.css">
+    <meta charset="utf-8">
+    
+  
+<link rel="preload" href="/volts-front-df17b97e2d181582_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="modulepreload" href="/volts-front-df17b97e2d181582.js"></head>
+  <body class="bg-body text-body font-body">
+  
+
+<script type="module">import init from '/volts-front-df17b97e2d181582.js';init('/volts-front-df17b97e2d181582_bg.wasm');</script><script>(function () {
+    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var url = protocol + '//' + window.location.host + '/_trunk/ws';
+    var poll_interval = 5000;
+    var reload_upon_connect = () => {
+        window.setTimeout(
+            () => {
+                // when we successfully reconnect, we'll force a
+                // reload (since we presumably lost connection to
+                // trunk due to it being killed, so it will have
+                // rebuilt on restart)
+                var ws = new WebSocket(url);
+                ws.onopen = () => window.location.reload();
+                ws.onclose = reload_upon_connect;
+            },
+            poll_interval);
+    };
+
+    var ws = new WebSocket(url);
+    ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.reload) {
+            window.location.reload();
+        }
+    };
+    ws.onclose = reload_upon_connect;
+})()
+</script></body></html>

@@ -9,3 +9,5 @@ CREATE TABLE "public"."api_tokens" (
     "revoked" bool NOT NULL DEFAULT false,
     CONSTRAINT "api_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id")
 );
+
+CREATE UNIQUE INDEX api_tokens_token ON api_tokens (token)

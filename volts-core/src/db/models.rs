@@ -1,10 +1,12 @@
 use chrono::NaiveDateTime;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::db::schema::{api_tokens, users};
 use crate::util::rfc3339;
 
-#[derive(Queryable, Debug, Identifiable, Associations, Serialize)]
+#[derive(
+    Queryable, Debug, Identifiable, Associations, Serialize, Deserialize, Clone, PartialEq, Eq,
+)]
 #[diesel(belongs_to(User))]
 pub struct ApiToken {
     pub id: i32,

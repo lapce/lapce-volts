@@ -3,7 +3,7 @@ use axum::{
     extract::{Query, State},
     http::{header::SET_COOKIE, HeaderMap, StatusCode},
     response::{IntoResponse, Redirect},
-    routing::get,
+    routing::{delete, get, post, put},
     Json, Router, TypedHeader,
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
@@ -11,11 +11,12 @@ use oauth2::{
     basic::BasicClient, reqwest::async_http_client, AuthorizationCode, Scope, TokenResponse,
 };
 use serde::Deserialize;
-use serde_json::json;
+use volts_core::{db::models::User, MeUser, NewSessionResponse};
 
 use crate::{
-    db::api::NewUser,
+    db::{find_user, NewUser},
     github::GithubClient,
+    plugin,
     state::{AppState, SESSION_COOKIE_NAME},
     token,
 };
@@ -25,7 +26,31 @@ pub fn build_router() -> Router<AppState> {
     Router::with_state(state)
         .route("/api/private/session", get(new_session))
         .route("/api/private/session/authorize", get(session_authorize))
+        .route("/api/private/session", delete(logout))
+        .route("/api/v1/me", get(me))
         .route("/api/v1/me/tokens", get(token::list))
+        .route("/api/v1/me/tokens", post(token::new))
+        .route("/api/v1/me/tokens/:id", delete(token::revoke))
+        .route("/api/v1/plugins/new", put(plugin::publish))
+}
+
+async fn me(
+    State(store): State<MemoryStore>,
+    State(db_pool): State<Pool<AsyncPgConnection>>,
+    TypedHeader(cookies): TypedHeader<headers::Cookie>,
+) -> impl IntoResponse {
+    let cookie = cookies.get(SESSION_COOKIE_NAME).unwrap();
+    let session = store
+        .load_session(cookie.to_string())
+        .await
+        .unwrap()
+        .unwrap();
+    let user_id: i32 = session.get("user_id").unwrap();
+    let mut conn = db_pool.get().await.unwrap();
+    let user = find_user(&mut conn, user_id).await.unwrap();
+    Json(MeUser {
+        login: user.gh_login,
+    })
 }
 
 async fn new_session(
@@ -34,7 +59,7 @@ async fn new_session(
 ) -> impl IntoResponse {
     let (url, state) = github_oauth
         .authorize_url(oauth2::CsrfToken::new_random)
-        .add_scope(Scope::new("read:org".to_string()))
+        .add_scope(Scope::new("read:user".to_string()))
         .url();
     let state = state.secret().to_string();
 
@@ -48,10 +73,10 @@ async fn new_session(
 
     (
         headers,
-        Json(json!({
-            "url": url,
-            "state": state,
-        })),
+        Json(NewSessionResponse {
+            url: url.as_str().to_string(),
+            state,
+        }),
     )
 }
 
@@ -102,5 +127,31 @@ async fn session_authorize(
 
     session.insert("user_id", user.id).unwrap();
 
-    Redirect::to("/").into_response()
+    println!("redirect to home page");
+    Redirect::temporary("/").into_response()
+}
+
+async fn logout(
+    State(store): State<MemoryStore>,
+    TypedHeader(cookies): TypedHeader<headers::Cookie>,
+) -> impl IntoResponse {
+    let cookie = cookies.get(SESSION_COOKIE_NAME).unwrap();
+    let mut session = store
+        .load_session(cookie.to_string())
+        .await
+        .unwrap()
+        .unwrap();
+    session.remove("user_id");
+}
+
+pub async fn authenticated_user(
+    State(store): State<MemoryStore>,
+    State(db_pool): State<Pool<AsyncPgConnection>>,
+    TypedHeader(cookies): TypedHeader<headers::Cookie>,
+) -> Option<User> {
+    let cookie = cookies.get(SESSION_COOKIE_NAME)?;
+    let session = store.load_session(cookie.to_string()).await.ok()??;
+    let user_id: i32 = session.get("user_id")?;
+    let mut conn = db_pool.get().await.ok()?;
+    find_user(&mut conn, user_id).await.ok()
 }
