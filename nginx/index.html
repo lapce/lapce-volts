@@ -3,6 +3,9 @@
   <head>
     <title>Lapce Plugins</title>
 	<link rel="stylesheet" href="/static/main.css"/>
+    <link rel="preload" href="/static/main.wasm" as="fetch" type="application/wasm" crossorigin="">
+    <link rel="modulepreload" href="/static/main.js"></head>
+    <script type="module">import init from '/static/main.js';init('/static/main.wasm');</script>
     <meta charset="utf-8" />
   </head>
   <body class = "bg-body text-body font-body">
