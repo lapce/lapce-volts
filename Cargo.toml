@@ -12,10 +12,6 @@ volts-back = { path = "./volts-back" }
 name = "volts-server"
 path = "volts-back/src/bin/server.rs"
 
-[[bin]]
-name = "volts-front"
-path = "volts-front/src/bin/front.rs"
-
 [workspace]
 memebers = [
   "volts-core",
