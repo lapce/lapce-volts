@@ -11,11 +11,33 @@ use volts_core::db::models::{ApiToken, User};
 use volts_core::db::schema::{api_tokens, users};
 use volts_core::EncodeApiToken;
 
-pub fn new_db_pool() -> Pool<AsyncPgConnection> {
-    let manager = diesel_async::pooled_connection::AsyncDieselConnectionManager::new(
-        std::env::var("DATABASE_URL").unwrap(),
-    );
-    Pool::builder(manager).build().unwrap()
+#[derive(Clone)]
+pub struct DbPool {
+    pub write: Pool<AsyncPgConnection>,
+    pub read: Pool<AsyncPgConnection>,
+}
+
+impl Default for DbPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DbPool {
+    pub fn new() -> Self {
+        let manager = diesel_async::pooled_connection::AsyncDieselConnectionManager::new(
+            std::env::var("DATABASE_URL").unwrap(),
+        );
+        let write = Pool::builder(manager).build().unwrap();
+
+        let manager = diesel_async::pooled_connection::AsyncDieselConnectionManager::new(
+            std::env::var("READ_DATABASE_URL")
+                .unwrap_or_else(|_| std::env::var("DATABASE_URL").unwrap()),
+        );
+        let read = Pool::builder(manager).build().unwrap();
+
+        Self { write, read }
+    }
 }
 
 /// Represents a new user record insertable to the `users` table

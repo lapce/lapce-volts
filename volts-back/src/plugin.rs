@@ -17,15 +17,15 @@ use tar::Archive;
 use tokio_util::io::StreamReader;
 use toml_edit::easy as toml;
 
-use crate::db::{find_api_token, find_user};
+use crate::db::{find_api_token, find_user, DbPool};
 
 pub async fn publish(
-    State(db_pool): State<Pool<AsyncPgConnection>>,
+    State(db_pool): State<DbPool>,
     TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
     body: BodyStream,
 ) -> impl IntoResponse {
-    let mut conn = db_pool.get().await.unwrap();
     let api_token = {
+        let mut conn = db_pool.read.get().await.unwrap();
         match find_api_token(&mut conn, token.token()).await {
             Ok(api_token) => api_token,
             Err(_) => {
@@ -34,7 +34,10 @@ pub async fn publish(
         }
     };
 
-    let user = find_user(&mut conn, api_token.user_id).await.unwrap();
+    let user = {
+        let mut conn = db_pool.read.get().await.unwrap();
+        find_user(&mut conn, api_token.user_id).await.unwrap()
+    };
 
     let dir = tempfile::TempDir::new().unwrap();
     let tar_gz = dir.path().join("plugin.tar.gz");

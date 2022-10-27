@@ -1,13 +1,16 @@
 pub(crate) mod components;
 
-use components::navbar::Navbar;
-use components::token::TokenList;
+use components::{navbar::Navbar, token::TokenList};
 use gloo_net::http::Request;
-use sycamore::component;
-use sycamore::prelude::view;
-use sycamore::reactive::{create_signal, provide_context_ref};
-use sycamore::{reactive::Scope, view::View, web::Html};
+use sycamore::{
+    component,
+    prelude::view,
+    reactive::{create_signal, provide_context_ref, Scope},
+    view::View,
+    web::Html,
+};
 use volts_core::MeUser;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 #[derive(Clone, PartialEq, Eq, Default)]
 pub struct AppContext {
@@ -18,8 +21,6 @@ pub struct AppContext {
 fn App<G: Html>(cx: Scope) -> View<G> {
     let ctx = create_signal(cx, AppContext::default());
     provide_context_ref(cx, ctx);
-
-    web_sys::console::log_1(&"app run".into());
 
     {
         let req = Request::get("/api/v1/me").send();
@@ -38,9 +39,9 @@ fn App<G: Html>(cx: Scope) -> View<G> {
     }
 }
 
+#[wasm_bindgen(start)]
 pub fn start_front() {
     console_error_panic_hook::set_once();
-    // yew::start_app::<App>();
     sycamore::render(|cx| {
         view! { cx,
             App {}

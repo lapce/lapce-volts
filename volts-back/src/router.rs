@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use async_session::{MemoryStore, Session, SessionStore};
 use axum::{
     extract::{Query, State},
@@ -8,13 +10,14 @@ use axum::{
 };
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use oauth2::{
-    basic::BasicClient, reqwest::async_http_client, AuthorizationCode, Scope, TokenResponse,
+    basic::BasicClient, reqwest::async_http_client, AuthorizationCode, RedirectUrl, Scope,
+    TokenResponse,
 };
 use serde::Deserialize;
 use volts_core::{db::models::User, MeUser, NewSessionResponse};
 
 use crate::{
-    db::{find_user, NewUser},
+    db::{find_user, DbPool, NewUser},
     github::GithubClient,
     plugin,
     state::{AppState, SESSION_COOKIE_NAME},
@@ -36,7 +39,7 @@ pub fn build_router() -> Router<AppState> {
 
 async fn me(
     State(store): State<MemoryStore>,
-    State(db_pool): State<Pool<AsyncPgConnection>>,
+    State(db_pool): State<DbPool>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
 ) -> impl IntoResponse {
     let cookie = cookies.get(SESSION_COOKIE_NAME).unwrap();
@@ -46,7 +49,7 @@ async fn me(
         .unwrap()
         .unwrap();
     let user_id: i32 = session.get("user_id").unwrap();
-    let mut conn = db_pool.get().await.unwrap();
+    let mut conn = db_pool.read.get().await.unwrap();
     let user = find_user(&mut conn, user_id).await.unwrap();
     Json(MeUser {
         login: user.gh_login,
@@ -91,7 +94,7 @@ async fn session_authorize(
     State(store): State<MemoryStore>,
     State(github_oauth): State<BasicClient>,
     State(github_client): State<GithubClient>,
-    State(db_pool): State<Pool<AsyncPgConnection>>,
+    State(db_pool): State<DbPool>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
 ) -> impl IntoResponse {
     let cookie = cookies.get(SESSION_COOKIE_NAME).unwrap();
@@ -118,7 +121,7 @@ async fn session_authorize(
 
     let ghuser = github_client.current_user(token).await.unwrap();
 
-    let mut conn = db_pool.get().await.unwrap();
+    let mut conn = db_pool.write.get().await.unwrap();
 
     let user = NewUser::new(ghuser.id, &ghuser.login, token.secret())
         .create_or_update(&mut conn)
@@ -146,12 +149,12 @@ async fn logout(
 
 pub async fn authenticated_user(
     State(store): State<MemoryStore>,
-    State(db_pool): State<Pool<AsyncPgConnection>>,
+    State(db_pool): State<DbPool>,
     TypedHeader(cookies): TypedHeader<headers::Cookie>,
 ) -> Option<User> {
     let cookie = cookies.get(SESSION_COOKIE_NAME)?;
     let session = store.load_session(cookie.to_string()).await.ok()??;
     let user_id: i32 = session.get("user_id")?;
-    let mut conn = db_pool.get().await.ok()?;
+    let mut conn = db_pool.read.get().await.ok()?;
     find_user(&mut conn, user_id).await.ok()
 }

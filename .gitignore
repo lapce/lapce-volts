@@ -1,2 +1,5 @@
 /target
 .env
+.DS_Store
+
+volts-front/dist/

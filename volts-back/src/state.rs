@@ -3,9 +3,9 @@ use std::env;
 use async_session::MemoryStore;
 use axum::extract::FromRef;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, TokenUrl};
+use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
 
-use crate::github::GithubClient;
+use crate::{db::DbPool, github::GithubClient};
 
 pub const SESSION_COOKIE_NAME: &str = "session";
 
@@ -14,7 +14,7 @@ pub struct AppState {
     /// The GitHub OAuth2 configuration
     pub github_oauth: BasicClient,
     github_client: GithubClient,
-    db_pool: Pool<AsyncPgConnection>,
+    db_pool: DbPool,
 }
 
 impl FromRef<AppState> for MemoryStore {
@@ -35,7 +35,7 @@ impl FromRef<AppState> for GithubClient {
     }
 }
 
-impl FromRef<AppState> for Pool<AsyncPgConnection> {
+impl FromRef<AppState> for DbPool {
     fn from_ref(state: &AppState) -> Self {
         state.db_pool.clone()
     }
@@ -71,7 +71,7 @@ impl AppState {
         );
         let store = MemoryStore::new();
         let github_client = GithubClient::new();
-        let db_pool = crate::db::new_db_pool();
+        let db_pool = crate::db::DbPool::new();
         Self {
             store,
             github_oauth,

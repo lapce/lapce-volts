@@ -109,18 +109,24 @@ fn get_api_tokens<'a>(cx: Scope<'a>, api_tokens: &'a Signal<Vec<IndexedApiToken>
 #[component]
 pub fn TokenList<G: Html>(cx: Scope) -> View<G> {
     let ctx = use_context::<Signal<AppContext>>(cx);
+    let creating = create_signal(cx, false);
 
     let new_token_name = create_signal(cx, None);
     let handle_new_token = move |_| {
         new_token_name.set(Some("".to_string()));
+        creating.set(false);
     };
 
     let tokens = create_signal(cx, Vec::new());
     get_api_tokens(cx, tokens);
 
+    let is_logged_in = create_signal(cx, false);
     create_effect(cx, move || {
         if ctx.get().login.is_some() {
+            is_logged_in.set(true);
             get_api_tokens(cx, tokens);
+        } else {
+            is_logged_in.set(false);
         }
     });
 
@@ -147,13 +153,15 @@ pub fn TokenList<G: Html>(cx: Scope) -> View<G> {
                 }];
                 new_tokens.extend((*tokens.get()).clone().into_iter());
                 tokens.set(new_tokens);
+                creating.set(false);
+                new_token_name.set(None);
             });
         }
-        new_token_name.set(None);
+        creating.set(true);
     };
 
     view! { cx,
-        (if *create_selector(cx, || ctx.get().login.is_none()).get() {
+        (if !*is_logged_in.get() {
             view! {cx, }
         } else {
             view! {cx,
@@ -164,7 +172,7 @@ pub fn TokenList<G: Html>(cx: Scope) -> View<G> {
                             button(
                                 class=(
                                     if *is_new_token_show.get() {
-                                        "p-2 text-center text-blue-50 bg-blue-500 rounded-md shadow disabled:bg-gray-200"
+                                        "p-2 text-center text-blue-50 bg-blue-500 rounded-md shadow disabled:bg-gray-500"
                                     } else {
                                         "p-2 text-center text-blue-50 bg-blue-500 rounded-md shadow"
                                     }
@@ -188,14 +196,26 @@ pub fn TokenList<G: Html>(cx: Scope) -> View<G> {
                                 input(
                                     class="p-2 border rounded-md w-full",
                                     placeholder="New token name",
+                                    disabled=*creating.get(),
                                     prop:value=(*new_token_name.get()).clone().unwrap_or_else(|| "".to_string()),
                                     on:input=handle_input,
                                 ) {}
                                 button(
-                                    class="ml-6 p-2 w-20 text-blue-50 bg-blue-500 rounded-md shadow",
+                                    class=(
+                                        if *creating.get() {
+                                            "ml-6 p-2 w-20 text-blue-50 bg-blue-500 rounded-md shadow disabled:bg-gray-500"
+                                        } else {
+                                            "ml-6 p-2 w-20 text-blue-50 bg-blue-500 rounded-md shadow"
+                                        }
+                                    ),
                                     on:click=handle_create_token,
+                                    disabled=*creating.get(),
                                 ) {
-                                    "Create"
+                                    (if *creating.get() {
+                                        "Creating"
+                                    } else {
+                                        "Create"
+                                    })
                                 }
                             }
                         }
