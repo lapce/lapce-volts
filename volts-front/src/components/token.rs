@@ -121,6 +121,7 @@ pub fn TokenList<G: Html>(cx: Scope) -> View<G> {
     get_api_tokens(cx, tokens);
 
     let is_logged_in = create_signal(cx, false);
+
     create_effect(cx, move || {
         if ctx.get().login.is_some() {
             is_logged_in.set(true);

@@ -6,4 +6,4 @@ create table users (
     gh_id             INTEGER NOT NULL
 );
 
-CREATE UNIQUE INDEX users_gh_id ON users (gh_id)
+CREATE UNIQUE INDEX users_gh_id ON users (gh_id);

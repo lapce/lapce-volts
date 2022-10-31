@@ -12,11 +12,13 @@ COPY Cargo.toml Cargo.lock ./
 COPY ./volts-back/Cargo.toml ./volts-back/
 COPY ./volts-core/Cargo.toml ./volts-core/
 COPY ./volts-front/Cargo.toml ./volts-front/
+COPY ./volts-cli/Cargo.toml ./volts-cli/
 # Needs at least a main.rs file with a main function
 RUN mkdir src && echo "fn main(){}" > src/main.rs
 RUN mkdir -p volts-back/src/bin && echo "fn main(){}" > volts-back/src/bin/server.rs && touch volts-back/src/lib.rs
 RUN mkdir volts-core/src && touch volts-core/src/lib.rs
 RUN mkdir -p volts-front/src/bin && echo "fn main(){}" > volts-front/src/bin/front.rs && touch volts-front/src/lib.rs
+RUN mkdir -p volts-cli/src/bin && echo "fn main(){}" > volts-cli/src/bin/volts.rs && touch volts-cli/src/lib.rs
 # Will build all dependent crates in release mode
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/src/app/target \
@@ -27,6 +29,7 @@ RUN rm src/main.rs
 COPY ./volts-back ./volts-back
 COPY ./volts-core ./volts-core
 COPY ./volts-front ./volts-front
+COPY ./volts-cli ./volts-cli
 RUN cargo build --bin volts-server --release
 
 RUN cd /usr/src/app/volts-front && wasm-pack build --target web 

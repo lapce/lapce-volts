@@ -2,8 +2,8 @@ use std::env;
 
 use async_session::MemoryStore;
 use axum::extract::FromRef;
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, RedirectUrl, TokenUrl};
+use oauth2::{basic::BasicClient, AuthUrl, ClientId, ClientSecret, TokenUrl};
+use s3::{creds::Credentials, Bucket, Region};
 
 use crate::{db::DbPool, github::GithubClient};
 
@@ -15,6 +15,7 @@ pub struct AppState {
     pub github_oauth: BasicClient,
     github_client: GithubClient,
     db_pool: DbPool,
+    bucket: Bucket,
 }
 
 impl FromRef<AppState> for MemoryStore {
@@ -38,6 +39,12 @@ impl FromRef<AppState> for GithubClient {
 impl FromRef<AppState> for DbPool {
     fn from_ref(state: &AppState) -> Self {
         state.db_pool.clone()
+    }
+}
+
+impl FromRef<AppState> for Bucket {
+    fn from_ref(state: &AppState) -> Self {
+        state.bucket.clone()
     }
 }
 
@@ -72,11 +79,21 @@ impl AppState {
         let store = MemoryStore::new();
         let github_client = GithubClient::new();
         let db_pool = crate::db::DbPool::new();
+        let bucket = Bucket::new(
+            "lapce-plugins",
+            Region::R2 {
+                account_id: env::var("R2_ACCOUNT_ID").unwrap(),
+            },
+            Credentials::from_env().unwrap(),
+        )
+        .unwrap()
+        .with_path_style();
         Self {
             store,
             github_oauth,
             github_client,
             db_pool,
+            bucket,
         }
     }
 }

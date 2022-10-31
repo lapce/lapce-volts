@@ -1,13 +1,10 @@
 use async_session::{MemoryStore, SessionStore};
 use axum::{
-    body::Body,
     extract::{Path, State},
     response::IntoResponse,
     Json, TypedHeader,
 };
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use serde::{Deserialize, Serialize};
-use volts_core::{ApiTokenList, EncodeApiToken, NewTokenPayload};
+use volts_core::{ApiTokenList, NewTokenPayload};
 
 use crate::{
     db::{find_user, insert_token, list_tokens, revoke_token, DbPool},

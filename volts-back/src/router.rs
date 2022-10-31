@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use async_session::{MemoryStore, Session, SessionStore};
 use axum::{
     extract::{Query, State},
@@ -8,10 +6,8 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router, TypedHeader,
 };
-use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
 use oauth2::{
-    basic::BasicClient, reqwest::async_http_client, AuthorizationCode, RedirectUrl, Scope,
-    TokenResponse,
+    basic::BasicClient, reqwest::async_http_client, AuthorizationCode, Scope, TokenResponse,
 };
 use serde::Deserialize;
 use volts_core::{db::models::User, MeUser, NewSessionResponse};

@@ -7,10 +7,15 @@ edition = "2021"
 tokio = { version = "1.21.2", features = ["full"] }
 volts-front = { path = "./volts-front" }
 volts-back = { path = "./volts-back" }
+volts = { path = "./volts-cli" }
 
 [[bin]]
 name = "volts-server"
 path = "volts-back/src/bin/server.rs"
+
+[[bin]]
+name = "volts"
+path = "volts-cli/src/bin/volts.rs"
 
 [workspace]
 memebers = [

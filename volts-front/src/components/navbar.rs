@@ -2,7 +2,7 @@ use gloo_net::http::Request;
 use sycamore::{
     component,
     prelude::view,
-    reactive::{create_effect, create_selector, create_signal, use_context, Scope, Signal},
+    reactive::{create_effect, create_signal, use_context, Scope, Signal},
     view::View,
     web::Html,
 };
@@ -13,6 +13,17 @@ use crate::AppContext;
 #[component]
 pub fn Navbar<G: Html>(cx: Scope) -> View<G> {
     let context = use_context::<Signal<AppContext>>(cx);
+    let is_logged_in = create_signal(cx, false);
+    let login = create_signal(cx, "".to_string());
+    create_effect(cx, move || {
+        if let Some(l) = context.get().login.as_ref() {
+            login.set(l.to_string());
+            is_logged_in.set(true);
+        } else {
+            is_logged_in.set(false);
+        }
+    });
+
     let handle_login = move |_| {
         let req = Request::get("/api/private/session").send();
         sycamore::futures::spawn_local(async move {
@@ -26,6 +37,7 @@ pub fn Navbar<G: Html>(cx: Scope) -> View<G> {
                 .unwrap();
         });
     };
+
     let handle_logout = move |_| {
         let req = Request::delete("/api/private/session");
         sycamore::futures::spawn_local(async move {
@@ -34,16 +46,7 @@ pub fn Navbar<G: Html>(cx: Scope) -> View<G> {
             web_sys::window().unwrap().location().set_href("/").unwrap();
         });
     };
-    let is_logged_in = create_signal(cx, false);
-    let login = create_signal(cx, "".to_string());
-    create_effect(cx, move || {
-        if let Some(l) = context.get().login.as_ref() {
-            login.set(l.to_string());
-            is_logged_in.set(true);
-        } else {
-            is_logged_in.set(false);
-        }
-    });
+
     view! { cx,
         div(class="relative bg-coolGray-50 overflow-hidden",
             style="background-image: linear-gradient(to right top, #4264af, #4f70ba, #5b7dc4, #688acf, #7597d9, #6ca0e0, #63a9e6, #5ab2eb, #2eb9e7, #00bfdd, #00c3cd, #10c6ba);"
