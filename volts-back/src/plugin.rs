@@ -12,7 +12,7 @@ use axum::{
     BoxError, TypedHeader,
 };
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use futures::{Stream, TryStreamExt};
+use futures::{FutureExt, Stream, TryStreamExt};
 use headers::authorization::Bearer;
 use lapce_rpc::plugin::VoltMetadata;
 use s3::Bucket;
@@ -21,7 +21,7 @@ use tar::Archive;
 use tokio_util::io::StreamReader;
 use toml_edit::easy as toml;
 
-use crate::db::{find_api_token, find_user, DbPool};
+use crate::db::{find_api_token, find_user, DbPool, NewPlugin, NewVersion};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -82,15 +82,25 @@ pub async fn publish(
     }
 
     let s = tokio::fs::read_to_string(&volt_path).await.unwrap();
-    let volt: VoltMetadata = match toml::from_str(&s) {
-        Ok(volt) => volt,
+    let volt = match toml::from_str::<VoltMetadata>(&s) {
+        Ok(mut volt) => {
+            volt.author = user.gh_login.clone();
+            volt
+        }
         Err(_) => return (StatusCode::BAD_REQUEST, "volt.tmol format invalid").into_response(),
     };
 
-    let s3_folder = format!("{}/{}/{}", user.gh_login, volt.name, volt.version);
+    {
+        let dest_volt_path = dest.path().join("volt.toml");
+        tokio::fs::write(
+            dest_volt_path,
+            toml_edit::ser::to_string_pretty(&volt).unwrap(),
+        )
+        .await
+        .unwrap();
+    }
 
-    let dest_volt_path = dest.path().join("volt.toml");
-    tokio::fs::copy(volt_path, dest_volt_path).await.unwrap();
+    let s3_folder = format!("{}/{}/{}", user.gh_login, volt.name, volt.version);
 
     if let Some(wasm) = volt.wasm.as_ref() {
         let wasm_path = dir.path().join(wasm);
@@ -235,6 +245,24 @@ pub async fn publish(
         .put_object(format!("{}/volt.tar.gz", s3_folder), &volt_content)
         .await
         .unwrap();
+
+    let mut conn = db_pool.write.get().await.unwrap();
+
+    let result: Result<()> = conn
+        .build_transaction()
+        .run(|conn| {
+            async move {
+                let new_plugin =
+                    NewPlugin::new(&volt.name, user.id, &volt.display_name, &volt.description);
+                let plugin = new_plugin.create_or_update(conn).await?;
+                let new_version = NewVersion::new(plugin.id, &volt.version);
+                new_version.create_or_update(conn).await?;
+                Ok(())
+            }
+            .boxed()
+        })
+        .await;
+    result.unwrap();
 
     ().into_response()
 }

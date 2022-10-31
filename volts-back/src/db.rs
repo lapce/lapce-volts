@@ -7,8 +7,9 @@ use diesel::NullableExpressionMethods;
 use diesel::QueryDsl;
 use diesel_async::RunQueryDsl;
 use diesel_async::{pooled_connection::deadpool::Pool, AsyncPgConnection};
-use volts_core::db::models::{ApiToken, User};
-use volts_core::db::schema::{api_tokens, users};
+use volts_core::db::models::Plugin;
+use volts_core::db::models::{ApiToken, User, Version};
+use volts_core::db::schema::{api_tokens, plugins, users, versions};
 use volts_core::EncodeApiToken;
 
 #[derive(Clone)]
@@ -137,4 +138,74 @@ pub async fn find_api_token(conn: &mut AsyncPgConnection, api_token: &str) -> Re
         .await?;
 
     Ok(token_)
+}
+
+#[derive(Insertable, Debug, Default)]
+#[diesel(table_name = plugins)]
+pub struct NewPlugin<'a> {
+    pub name: &'a str,
+    pub user_id: i32,
+    pub display_name: &'a str,
+    pub description: &'a str,
+    pub downloads: i32,
+}
+
+impl<'a> NewPlugin<'a> {
+    pub fn new(name: &'a str, user_id: i32, display_name: &'a str, description: &'a str) -> Self {
+        NewPlugin {
+            name,
+            user_id,
+            display_name,
+            description,
+            downloads: 0,
+        }
+    }
+
+    pub async fn create_or_update(&self, conn: &mut AsyncPgConnection) -> Result<Plugin> {
+        use diesel::pg::upsert::excluded;
+        use volts_core::db::schema::plugins::dsl::*;
+
+        let plugin: Plugin = diesel::insert_into(plugins)
+            .values(self)
+            .on_conflict((user_id, name))
+            .do_update()
+            .set((
+                display_name.eq(excluded(display_name)),
+                description.eq(excluded(description)),
+            ))
+            .get_result(conn)
+            .await?;
+        Ok(plugin)
+    }
+}
+
+#[derive(Insertable, Debug, Default)]
+#[diesel(table_name = versions)]
+pub struct NewVersion<'a> {
+    pub plugin_id: i32,
+    pub num: &'a str,
+    pub yanked: bool,
+}
+
+impl<'a> NewVersion<'a> {
+    pub fn new(plugin_id: i32, num: &'a str) -> Self {
+        NewVersion {
+            plugin_id,
+            num,
+            yanked: false,
+        }
+    }
+
+    pub async fn create_or_update(&self, conn: &mut AsyncPgConnection) -> Result<Version> {
+        use volts_core::db::schema::versions::dsl::*;
+
+        let version: Version = diesel::insert_into(versions)
+            .values(self)
+            .on_conflict((plugin_id, num))
+            .do_update()
+            .set(updated_at.eq(chrono::Utc::now().naive_utc()))
+            .get_result(conn)
+            .await?;
+        Ok(version)
+    }
 }

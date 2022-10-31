@@ -5,6 +5,7 @@ create table versions (
     updated_at        timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at        timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
     num               VARCHAR NOT NULL,
+    downloads         INTEGER NOT NULL DEFAULT 0,
     yanked            bool NOT NULL DEFAULT false,
     CONSTRAINT "versions_plugin_id_fkey" FOREIGN KEY ("plugin_id") REFERENCES "public"."plugins"("id")
 );

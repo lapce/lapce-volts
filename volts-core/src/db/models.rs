@@ -30,3 +30,27 @@ pub struct User {
     pub gh_login: String,
     pub gh_id: i32,
 }
+
+#[derive(Queryable, Debug)]
+pub struct Plugin {
+    pub id: i32,
+    pub name: String,
+    pub user_id: i32,
+    pub updated_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
+    pub display_name: String,
+    pub description: String,
+    pub downloads: i32,
+    pub repository: Option<String>,
+}
+
+#[derive(Queryable, Debug)]
+pub struct Version {
+    pub id: i32,
+    pub plugin_id: i32,
+    pub updated_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
+    pub num: String,
+    pub downloads: i32,
+    pub yanked: bool,
+}
