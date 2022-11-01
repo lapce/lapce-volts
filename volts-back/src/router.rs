@@ -145,7 +145,7 @@ async fn session_authorize(
     session.insert("user_id", user.id).unwrap();
 
     println!("redirect to home page");
-    Redirect::temporary("/account").into_response()
+    Redirect::temporary("/account/").into_response()
 }
 
 async fn logout(

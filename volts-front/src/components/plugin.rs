@@ -41,16 +41,16 @@ fn PluginItem<'a, G: Html>(
 ) -> View<G> {
     view! {cx,
         div(
-            class = "w-full md:w-1/2 lg:w-1/3 py-4 border rounded-md"
+            class = "w-full md:w-1/2 lg:w-1/3 p-4"
         ) {
             li(
-                class="flex"
+                class="flex border rounded-md py-4 w-full"
             ) {
                 img(
-                    class="m-4 h-16 w-16",
+                    class="m-4 h-auto w-16",
                     src="https://raw.githubusercontent.com/lapce/lapce/master/extra/images/logo.png",
                 ) {}
-                div(class="flex flex-col justify-between max-w-full w-full mr-4") {
+                div(class="flex flex-col justify-between w-[calc(100%-6rem)] pr-4") {
                     div {
                         p(
                             class="font-bold"
@@ -88,7 +88,7 @@ pub fn PluginList<G: Html>(cx: Scope) -> View<G> {
             h1(class="mt-3 mx-3 font-bold") {
                 "Most Downloaded"
             }
-            ul(class="p-3") {
+            ul(class="flex flex-wrap") {
                 Keyed(
                     iterable=plugins,
                     view=move |cx, plugin| view! {cx,

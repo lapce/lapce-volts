@@ -81,7 +81,10 @@ pub fn Navbar<G: Html>(cx: Scope) -> View<G> {
                     }
                     (if *is_logged_in.get() {
                         view! { cx,
-                            span(class="text-blue-50") { (login.get()) }
+                            a(
+                                class="text-blue-50",
+                                href="/account"
+                            ) { (login.get()) }
                             button(
                                 class="text-blue-50 ml-4",
                                 on:click=handle_logout,
