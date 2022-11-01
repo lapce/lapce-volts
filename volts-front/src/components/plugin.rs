@@ -41,33 +41,37 @@ fn PluginItem<'a, G: Html>(
 ) -> View<G> {
     view! {cx,
         div(
-            class = "w-full md:w-1/2 lg:w-1/3 px-4 border rounded-md text-center"
+            class = "w-full md:w-1/2 lg:w-1/3 py-4 border rounded-md"
         ) {
             li(
-                class=""
+                class="flex"
             ) {
                 img(
-                    class="inline-flex my-4 h-16 w-16",
+                    class="m-4 h-16 w-16",
                     src="https://raw.githubusercontent.com/lapce/lapce/master/extra/images/logo.png",
                 ) {}
-                p(
-                    class="font-bold"
-                ) {
-                    (plugin.plugin.display_name)
-                }
-                p(
-                    class="text-ellipsis whitespace-nowrap overflow-hidden w-full"
-                ) {
-                    (plugin.plugin.description)
-                }
-                div(
-                    class="flex justify-between text-sm text-gray-200"
-                ) {
-                    p {
-                        (plugin.plugin.downloads)
+                div(class="flex flex-col justify-between max-w-full w-full mr-4") {
+                    div {
+                        p(
+                            class="font-bold"
+                        ) {
+                            (plugin.plugin.display_name)
+                        }
+                        p(
+                            class="mt-1 text-ellipsis whitespace-nowrap overflow-hidden"
+                        ) {
+                            (plugin.plugin.description)
+                        }
                     }
-                    p {
-                        "Downloads: " (plugin.plugin.downloads)
+                    div(
+                        class="flex justify-between text-sm text-gray-400 mt-3"
+                    ) {
+                        p {
+                            (plugin.plugin.author)
+                        }
+                        p {
+                            "Downloads: " (plugin.plugin.downloads)
+                        }
                     }
                 }
             }
@@ -80,14 +84,19 @@ pub fn PluginList<G: Html>(cx: Scope) -> View<G> {
     let plugins = create_signal(cx, Vec::new());
     get_plugins(cx, "", plugins);
     view! {cx,
-        ul(class="") {
-            Keyed(
-                iterable=plugins,
-                view=move |cx, plugin| view! {cx,
-                    PluginItem(plugin=plugin, plugins=plugins)
-                },
-                key=|plugin| plugin.plugin.name.clone(),
-            )
+        div(class="container m-auto") {
+            h1(class="mt-3 mx-3 font-bold") {
+                "Most Downloaded"
+            }
+            ul(class="p-3") {
+                Keyed(
+                    iterable=plugins,
+                    view=move |cx, plugin| view! {cx,
+                        PluginItem(plugin=plugin, plugins=plugins)
+                    },
+                    key=|plugin| plugin.plugin.name.clone(),
+                )
+            }
         }
     }
 }
