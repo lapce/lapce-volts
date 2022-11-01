@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 reqwest = { version = "0.11.12", features = ["blocking"] }
-lapce-rpc = { git = "https://github.com/lapce/lapce" }
+lapce-rpc = "0.2.1"
 tempfile = "3.3.0"
 flate2 = "1.0.24"
 tar = "0.4.38"

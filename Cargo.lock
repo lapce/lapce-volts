@@ -1094,6 +1094,22 @@ dependencies = [
 [[package]]
 name = "lapce-rpc"
 version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cb312ed6e918642f8025c9aa33a7becaf0ad4b389c2d884548094a6edbbb9a3"
+dependencies = [
+ "anyhow",
+ "crossbeam-channel",
+ "lapce-xi-rope",
+ "log",
+ "lsp-types",
+ "parking_lot 0.11.2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lapce-rpc"
+version = "0.2.1"
 source = "git+https://github.com/lapce/lapce#4f162c2a40317e3df687b6600451445fce309355"
 dependencies = [
  "anyhow",
@@ -1114,6 +1130,19 @@ dependencies = [
  "volts",
  "volts-back",
  "volts-front",
+]
+
+[[package]]
+name = "lapce-xi-rope"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08ae23edb8cf91f01edd9a87c88623eae3977c8d647a31c57cb12f1a125ca10a"
+dependencies = [
+ "bytecount",
+ "memchr",
+ "regex",
+ "serde",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -2596,7 +2625,7 @@ name = "volts"
 version = "0.1.0"
 dependencies = [
  "flate2",
- "lapce-rpc",
+ "lapce-rpc 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest",
  "serde",
  "tar",
@@ -2618,7 +2647,7 @@ dependencies = [
  "flate2",
  "futures",
  "headers",
- "lapce-rpc",
+ "lapce-rpc 0.2.1 (git+https://github.com/lapce/lapce)",
  "oauth2",
  "rand",
  "reqwest",
