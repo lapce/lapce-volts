@@ -33,3 +33,22 @@ pub struct EncodeApiToken {
 pub struct NewTokenPayload {
     pub name: String,
 }
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
+pub struct EncodePlugin {
+    pub name: String,
+    pub author: String,
+    pub version: String,
+    pub display_name: String,
+    pub description: String,
+    pub downloads: i32,
+    pub repository: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PluginList {
+    pub total: i64,
+    pub limit: usize,
+    pub page: usize,
+    pub plugins: Vec<EncodePlugin>,
+}

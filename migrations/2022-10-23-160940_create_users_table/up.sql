@@ -7,3 +7,4 @@ create table users (
 );
 
 CREATE UNIQUE INDEX users_gh_id ON users (gh_id);
+CREATE INDEX users_gh_login ON users (gh_login);

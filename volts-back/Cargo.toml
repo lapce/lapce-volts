@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+semver = "1.0.14"
 rust-s3 = { version = "0.32.3", features = ["with-tokio"] }
 tempfile = "3.3.0"
 flate2 = "1.0.24"

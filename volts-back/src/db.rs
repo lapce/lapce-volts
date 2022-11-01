@@ -83,6 +83,14 @@ pub async fn find_user(conn: &mut AsyncPgConnection, id: i32) -> Result<User> {
     Ok(user)
 }
 
+pub async fn find_user_by_gh_login(conn: &mut AsyncPgConnection, gh_login: &str) -> Result<User> {
+    let user = users::table
+        .filter(users::gh_login.eq(gh_login))
+        .first(conn)
+        .await?;
+    Ok(user)
+}
+
 pub async fn list_tokens(conn: &mut AsyncPgConnection, user: &User) -> Result<Vec<ApiToken>> {
     let tokens: Vec<ApiToken> = ApiToken::belonging_to(&user)
         .filter(api_tokens::revoked.eq(false))
@@ -172,6 +180,7 @@ impl<'a> NewPlugin<'a> {
             .set((
                 display_name.eq(excluded(display_name)),
                 description.eq(excluded(description)),
+                updated_at.eq(chrono::Utc::now().naive_utc()),
             ))
             .get_result(conn)
             .await?;
@@ -208,4 +217,40 @@ impl<'a> NewVersion<'a> {
             .await?;
         Ok(version)
     }
+}
+
+pub async fn find_plugin(conn: &mut AsyncPgConnection, user: &User, name: &str) -> Result<Plugin> {
+    let plugin = Plugin::belonging_to(user)
+        .filter(plugins::name.eq(name))
+        .get_result(conn)
+        .await?;
+    Ok(plugin)
+}
+
+pub async fn find_plugin_version(
+    conn: &mut AsyncPgConnection,
+    plugin: &Plugin,
+    num: &str,
+) -> Result<Version> {
+    let version = Version::belonging_to(plugin)
+        .filter(versions::num.eq(num))
+        .get_result(conn)
+        .await?;
+    Ok(version)
+}
+
+pub async fn modify_plugin_version_yank(
+    conn: &mut AsyncPgConnection,
+    plugin: &Plugin,
+    num: &str,
+    is_yanked: bool,
+) -> Result<Version> {
+    let version = diesel::update(Version::belonging_to(plugin).filter(versions::num.eq(num)))
+        .set((
+            versions::yanked.eq(is_yanked),
+            versions::updated_at.eq(chrono::Utc::now().naive_utc()),
+        ))
+        .get_result(conn)
+        .await?;
+    Ok(version)
 }

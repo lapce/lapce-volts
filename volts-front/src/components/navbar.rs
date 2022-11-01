@@ -53,12 +53,17 @@ pub fn Navbar<G: Html>(cx: Scope) -> View<G> {
         ) {
             nav(class="flex flex-wrap items-center justify-between container m-auto py-6 px-0") {
                 div(class="flex items-center"){
-                    img(
-                       class="h-10 mr-2",
-                       src="https://raw.githubusercontent.com/lapce/lapce/master/extra/images/logo.png",
-                    ) {}
-                    a(class="text-blue-50") {
-                        "Lapce Plugins"
+                    a(
+                        class="flex items-center",
+                        href="/",
+                    ) {
+                        img(
+                        class="h-10 mr-2",
+                        src="https://raw.githubusercontent.com/lapce/lapce/master/extra/images/logo.png",
+                        ) {}
+                        a(class="text-blue-50") {
+                            "Lapce Plugins"
+                        }
                     }
                 }
                 div(class="flex items-center"){

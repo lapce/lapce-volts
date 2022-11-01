@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 
-use crate::db::schema::{api_tokens, users};
+use crate::db::schema::{api_tokens, plugins, users, versions};
 use crate::util::rfc3339;
 
 #[derive(
@@ -31,7 +31,8 @@ pub struct User {
     pub gh_id: i32,
 }
 
-#[derive(Queryable, Debug)]
+#[derive(Queryable, Debug, Identifiable, Associations)]
+#[diesel(belongs_to(User))]
 pub struct Plugin {
     pub id: i32,
     pub name: String,
@@ -44,13 +45,14 @@ pub struct Plugin {
     pub repository: Option<String>,
 }
 
-#[derive(Queryable, Debug)]
+#[derive(Queryable, Debug, Identifiable, Associations)]
+#[diesel(belongs_to(Plugin))]
 pub struct Version {
     pub id: i32,
     pub plugin_id: i32,
     pub updated_at: NaiveDateTime,
     pub created_at: NaiveDateTime,
     pub num: String,
-    pub downloads: i32,
     pub yanked: bool,
+    pub downloads: i32,
 }

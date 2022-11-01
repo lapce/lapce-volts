@@ -1,16 +1,16 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-};
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use axum::{
     body::Bytes,
-    extract::{BodyStream, State},
+    extract::{BodyStream, Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    BoxError, TypedHeader,
+    BoxError, Json, TypedHeader,
 };
+use diesel::{BelongingToDsl, BoolExpressionMethods, ExpressionMethods, GroupedBy};
+use diesel::{PgTextExpressionMethods, QueryDsl};
+use diesel_async::RunQueryDsl;
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use futures::{FutureExt, Stream, TryStreamExt};
 use headers::authorization::Bearer;
@@ -20,8 +20,18 @@ use serde::{Deserialize, Serialize};
 use tar::Archive;
 use tokio_util::io::StreamReader;
 use toml_edit::easy as toml;
+use volts_core::{
+    db::{
+        models::{Plugin, User, Version},
+        schema::{plugins, users, versions},
+    },
+    EncodePlugin, PluginList,
+};
 
-use crate::db::{find_api_token, find_user, DbPool, NewPlugin, NewVersion};
+use crate::db::{
+    find_api_token, find_plugin, find_plugin_version, find_user, find_user_by_gh_login,
+    modify_plugin_version_yank, DbPool, NewPlugin, NewVersion,
+};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -35,6 +45,156 @@ struct IconThemeConfig {
     pub foldername: HashMap<String, String>,
     pub filename: HashMap<String, String>,
     pub extension: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SearchQuery {
+    q: Option<String>,
+    limit: Option<usize>,
+    page: Option<usize>,
+}
+
+pub async fn search(
+    Query(query): Query<SearchQuery>,
+    State(db_pool): State<DbPool>,
+) -> impl IntoResponse {
+    let limit = query.limit.unwrap_or(10).min(100);
+    let page = query.page.unwrap_or(0);
+    let offset = page * limit;
+    let mut conn = db_pool.read.get().await.unwrap();
+    let mut sql_query = plugins::table.inner_join(users::dsl::users).into_boxed();
+    let mut total: i64 = 0;
+    if let Some(q) = query.q.as_ref() {
+        if !q.is_empty() {
+            let q = format!("%{q}%");
+
+            let filter = plugins::name
+                .ilike(q.clone())
+                .or(plugins::description.ilike(q));
+            sql_query = sql_query.filter(filter.clone());
+
+            total = plugins::table
+                .filter(filter)
+                .count()
+                .get_result(&mut conn)
+                .await
+                .unwrap();
+        }
+    }
+
+    sql_query = sql_query
+        .order(plugins::downloads.desc())
+        .offset(offset as i64)
+        .limit(limit as i64);
+    let data: Vec<(Plugin, User)> = sql_query.load(&mut conn).await.unwrap();
+
+    let plugins = data.iter().map(|(p, u)| p).collect::<Vec<&Plugin>>();
+
+    let versions: Vec<Version> = Version::belonging_to(plugins.as_slice())
+        .filter(versions::yanked.eq(false))
+        .load(&mut conn)
+        .await
+        .unwrap();
+
+    let versions = versions.grouped_by(&plugins).into_iter().map(|versions| {
+        versions
+            .iter()
+            .filter_map(|v| semver::Version::parse(&v.num).ok())
+            .max()
+    });
+
+    let plugins: Vec<EncodePlugin> = versions
+        .zip(data)
+        .filter_map(|(v, (p, u))| {
+            Some(EncodePlugin {
+                name: p.name,
+                author: u.gh_login,
+                version: v?.to_string(),
+                display_name: p.display_name,
+                description: p.description,
+                downloads: p.downloads,
+                repository: p.repository,
+            })
+        })
+        .collect();
+
+    Json(PluginList {
+        total,
+        limit,
+        page,
+        plugins,
+    })
+}
+
+pub async fn download(
+    State(bucket): State<Bucket>,
+    State(db_pool): State<DbPool>,
+    Path((author, name, version)): Path<(String, String, String)>,
+) -> impl IntoResponse {
+    let mut conn = db_pool.read.get().await.unwrap();
+    let user = find_user_by_gh_login(&mut conn, &author).await.unwrap();
+    let name = name.to_lowercase();
+    let plugin = find_plugin(&mut conn, &user, &name).await.unwrap();
+    let version = find_plugin_version(&mut conn, &plugin, &version)
+        .await
+        .unwrap();
+    {
+        let mut conn = db_pool.write.get().await.unwrap();
+        diesel::update(plugins::dsl::plugins.find(plugin.id))
+            .set(plugins::downloads.eq(plugins::downloads + 1))
+            .execute(&mut conn)
+            .await
+            .unwrap();
+        diesel::update(versions::dsl::versions.find(version.id))
+            .set(versions::downloads.eq(versions::downloads + 1))
+            .execute(&mut conn)
+            .await
+            .unwrap();
+    }
+
+    let s3_path = format!("{}/{}/{}/volt.tar.gz", user.gh_login, name, version.num);
+    bucket.presign_get(&s3_path, 60, None).unwrap()
+}
+
+pub async fn readme(
+    State(bucket): State<Bucket>,
+    State(db_pool): State<DbPool>,
+    Path((author, name, version)): Path<(String, String, String)>,
+) -> impl IntoResponse {
+    let mut conn = db_pool.read.get().await.unwrap();
+    let user = find_user_by_gh_login(&mut conn, &author).await.unwrap();
+    let name = name.to_lowercase();
+    let plugin = find_plugin(&mut conn, &user, &name).await.unwrap();
+    let version = find_plugin_version(&mut conn, &plugin, &version)
+        .await
+        .unwrap();
+    let s3_path = format!("{}/{}/{}/readme", user.gh_login, name, version.num);
+    let resp = bucket.get_object(&s3_path).await.unwrap();
+    if resp.status_code() != 200 {
+        return (
+            axum::http::StatusCode::from_u16(resp.status_code()).unwrap(),
+            "can't download README.md",
+        )
+            .into_response();
+    }
+
+    resp.bytes().to_vec().into_response()
+}
+
+pub async fn icon(
+    State(bucket): State<Bucket>,
+    State(db_pool): State<DbPool>,
+    Path((author, name, version)): Path<(String, String, String)>,
+) -> impl IntoResponse {
+    let mut conn = db_pool.read.get().await.unwrap();
+    let user = find_user_by_gh_login(&mut conn, &author).await.unwrap();
+    let name = name.to_lowercase();
+    let plugin = find_plugin(&mut conn, &user, &name).await.unwrap();
+    let version = find_plugin_version(&mut conn, &plugin, &version)
+        .await
+        .unwrap();
+    let s3_path = format!("{}/{}/{}/icon", user.gh_login, name, version.num);
+    bucket.presign_get(&s3_path, 60, None).unwrap()
 }
 
 pub async fn publish(
@@ -85,6 +245,7 @@ pub async fn publish(
     let volt = match toml::from_str::<VoltMetadata>(&s) {
         Ok(mut volt) => {
             volt.author = user.gh_login.clone();
+            volt.name = volt.name.to_lowercase();
             volt
         }
         Err(_) => return (StatusCode::BAD_REQUEST, "volt.tmol format invalid").into_response(),
@@ -180,6 +341,16 @@ pub async fn publish(
                     return (StatusCode::BAD_REQUEST, format!("icon {icon} not found"))
                         .into_response();
                 }
+
+                let icon_content = tokio::fs::read(&icon_path).await.unwrap();
+                bucket
+                    .put_object(
+                        &format!("{}/{}/{}/icon", user.gh_login, volt.name, volt.version),
+                        &icon_content,
+                    )
+                    .await
+                    .unwrap();
+
                 let dest_icon = dest_cwd.join(icon);
                 tokio::fs::create_dir_all(dest_icon.parent().unwrap())
                     .await
@@ -267,7 +438,7 @@ pub async fn publish(
     ().into_response()
 }
 
-async fn stream_to_file<S, E>(path: &Path, stream: S) -> Result<()>
+async fn stream_to_file<S, E>(path: &std::path::Path, stream: S) -> Result<()>
 where
     S: Stream<Item = Result<Bytes, E>>,
     E: Into<BoxError>,
@@ -279,5 +450,78 @@ where
 
     let mut tar_gz = tokio::fs::File::create(path).await?;
     tokio::io::copy(&mut body_reader, &mut tar_gz).await?;
+    Ok(())
+}
+
+pub async fn yank(
+    TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
+    State(db_pool): State<DbPool>,
+    Path((name, version)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let api_token = {
+        let mut conn = db_pool.write.get().await.unwrap();
+        match find_api_token(&mut conn, token.token()).await {
+            Ok(api_token) => api_token,
+            Err(_) => {
+                return (axum::http::StatusCode::UNAUTHORIZED, "API Token Invalid").into_response()
+            }
+        }
+    };
+
+    let user = {
+        let mut conn = db_pool.read.get().await.unwrap();
+        find_user(&mut conn, api_token.user_id).await.unwrap()
+    };
+
+    if let Err(e) = modify_yank(&user, State(db_pool), Path((name, version)), true).await {
+        return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
+    }
+
+    ().into_response()
+}
+
+pub async fn unyank(
+    TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
+    State(db_pool): State<DbPool>,
+    Path((name, version)): Path<(String, String)>,
+) -> impl IntoResponse {
+    let api_token = {
+        let mut conn = db_pool.write.get().await.unwrap();
+        match find_api_token(&mut conn, token.token()).await {
+            Ok(api_token) => api_token,
+            Err(_) => {
+                return (axum::http::StatusCode::UNAUTHORIZED, "API Token Invalid").into_response()
+            }
+        }
+    };
+
+    let user = {
+        let mut conn = db_pool.read.get().await.unwrap();
+        find_user(&mut conn, api_token.user_id).await.unwrap()
+    };
+
+    if let Err(e) = modify_yank(&user, State(db_pool), Path((name, version)), false).await {
+        return (axum::http::StatusCode::BAD_REQUEST, e.to_string()).into_response();
+    }
+
+    ().into_response()
+}
+
+async fn modify_yank(
+    user: &User,
+    State(db_pool): State<DbPool>,
+    Path((name, version)): Path<(String, String)>,
+    yanked: bool,
+) -> Result<()> {
+    let plugin = {
+        let mut conn = db_pool.read.get().await?;
+        find_plugin(&mut conn, user, &name).await?
+    };
+
+    {
+        let mut conn = db_pool.write.get().await?;
+        modify_plugin_version_yank(&mut conn, &plugin, &version, yanked).await?;
+    }
+
     Ok(())
 }

@@ -138,7 +138,10 @@ pub fn publish() {
     }
 
     let resp = reqwest::blocking::Client::new()
-        .request(Method::PUT, "https://plugins.lapce.dev/api/v1/plugins/new")
+        .request(
+            Method::PUT,
+            "https://plugins.lapce.dev/api/v1/me/plugins/new",
+        )
         .bearer_auth(token.trim())
         .body(std::fs::File::open(&tar_gz_path).unwrap())
         .send()

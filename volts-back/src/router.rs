@@ -30,7 +30,25 @@ pub fn build_router() -> Router<AppState> {
         .route("/api/v1/me/tokens", get(token::list))
         .route("/api/v1/me/tokens", post(token::new))
         .route("/api/v1/me/tokens/:id", delete(token::revoke))
-        .route("/api/v1/plugins/new", put(plugin::publish))
+        .route("/api/v1/me/plugins/new", put(plugin::publish))
+        .route("/api/v1/me/plugins/:name/:version/yank", put(plugin::yank))
+        .route(
+            "/api/v1/me/plugins/:name/:version/unyank",
+            put(plugin::unyank),
+        )
+        .route("/api/v1/plugins", get(plugin::search))
+        .route(
+            "/api/v1/plugins/:author/:name/:version/download",
+            get(plugin::download),
+        )
+        .route(
+            "/api/v1/plugins/:author/:name/:version/readme",
+            get(plugin::readme),
+        )
+        .route(
+            "/api/v1/plugins/:author/:name/:version/icon",
+            get(plugin::icon),
+        )
 }
 
 async fn me(
@@ -127,7 +145,7 @@ async fn session_authorize(
     session.insert("user_id", user.id).unwrap();
 
     println!("redirect to home page");
-    Redirect::temporary("/").into_response()
+    Redirect::temporary("/account").into_response()
 }
 
 async fn logout(
