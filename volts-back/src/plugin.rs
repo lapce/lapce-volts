@@ -50,6 +50,7 @@ struct IconThemeConfig {
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
     q: Option<String>,
+    sort: Option<String>,
     limit: Option<usize>,
     page: Option<usize>,
 }
@@ -82,10 +83,18 @@ pub async fn search(
         }
     }
 
-    sql_query = sql_query
-        .order(plugins::downloads.desc())
-        .offset(offset as i64)
-        .limit(limit as i64);
+    sql_query = sql_query.offset(offset as i64).limit(limit as i64);
+    match query.sort.as_deref() {
+        Some("created") => {
+            sql_query = sql_query.order(plugins::created_at.desc());
+        }
+        Some("updated") => {
+            sql_query = sql_query.order(plugins::updated_at.desc());
+        }
+        _ => {
+            sql_query = sql_query.order(plugins::downloads.desc());
+        }
+    }
     let data: Vec<(Plugin, User)> = sql_query.load(&mut conn).await.unwrap();
 
     let plugins = data.iter().map(|(p, u)| p).collect::<Vec<&Plugin>>();
@@ -114,6 +123,7 @@ pub async fn search(
                 description: p.description,
                 downloads: p.downloads,
                 repository: p.repository,
+                updated_at: p.updated_at,
             })
         })
         .collect();
@@ -169,11 +179,21 @@ pub async fn readme(
         .await
         .unwrap();
     let s3_path = format!("{}/{}/{}/readme", user.gh_login, name, version.num);
-    let resp = bucket.get_object(&s3_path).await.unwrap();
+    let result = bucket.get_object(&s3_path).await;
+    let resp = match result {
+        Ok(resp) => resp,
+        Err(_) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "can't download readme",
+            )
+                .into_response();
+        }
+    };
     if resp.status_code() != 200 {
         return (
             axum::http::StatusCode::from_u16(resp.status_code()).unwrap(),
-            "can't download README.md",
+            "can't download readme",
         )
             .into_response();
     }
@@ -185,7 +205,7 @@ pub async fn icon(
     State(bucket): State<Bucket>,
     State(db_pool): State<DbPool>,
     Path((author, name, version)): Path<(String, String, String)>,
-) -> impl IntoResponse {
+) -> axum::response::Response {
     let mut conn = db_pool.read.get().await.unwrap();
     let user = find_user_by_gh_login(&mut conn, &author).await.unwrap();
     let name = name.to_lowercase();
@@ -194,7 +214,45 @@ pub async fn icon(
         .await
         .unwrap();
     let s3_path = format!("{}/{}/{}/icon", user.gh_login, name, version.num);
-    bucket.presign_get(&s3_path, 60, None).unwrap()
+    let content_type = match bucket.head_object(&s3_path).await {
+        Ok((head, _)) => head.content_type,
+        Err(_) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "can't download icon",
+            )
+                .into_response();
+        }
+    };
+
+    let result = bucket.get_object(&s3_path).await;
+    let resp = match result {
+        Ok(resp) => resp,
+        Err(_) => {
+            return (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                "can't download icon",
+            )
+                .into_response();
+        }
+    };
+    if resp.status_code() != 200 {
+        return (
+            axum::http::StatusCode::from_u16(resp.status_code()).unwrap(),
+            "can't download icon",
+        )
+            .into_response();
+    }
+
+    let mut res = axum::body::Full::from(resp.bytes().to_vec()).into_response();
+    res.headers_mut().insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::header::HeaderValue::from_str(
+            &content_type.unwrap_or_else(|| "image/*".to_string()),
+        )
+        .unwrap(),
+    );
+    res
 }
 
 pub async fn publish(
@@ -380,11 +438,18 @@ pub async fn publish(
     if let Some(icon) = volt.icon.as_ref() {
         let icon_path = dir.path().join(icon);
         if icon_path.exists() {
+            let content_type = match icon_path.extension().and_then(|s| s.to_str()) {
+                Some("png") => "image/png",
+                Some("jpg") | Some("jpeg") => "image/jpeg",
+                Some("svg") => "image/svg+xml",
+                _ => "image/*",
+            };
             let icon_content = tokio::fs::read(&icon_path).await.unwrap();
             bucket
-                .put_object(
+                .put_object_with_content_type(
                     &format!("{}/{}/{}/icon", user.gh_login, volt.name, volt.version),
                     &icon_content,
+                    content_type,
                 )
                 .await
                 .unwrap();

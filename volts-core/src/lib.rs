@@ -4,6 +4,7 @@ pub mod util;
 #[macro_use]
 extern crate diesel;
 
+use chrono::NaiveDateTime;
 use db::models::ApiToken;
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +44,7 @@ pub struct EncodePlugin {
     pub description: String,
     pub downloads: i32,
     pub repository: Option<String>,
+    pub updated_at: NaiveDateTime,
 }
 
 #[derive(Serialize, Deserialize)]

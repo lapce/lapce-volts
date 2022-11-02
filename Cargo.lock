@@ -2684,6 +2684,7 @@ dependencies = [
  "gloo-timers",
  "sycamore",
  "sycamore-router",
+ "url",
  "volts-core",
  "wasm-bindgen",
  "wasm-bindgen-futures",

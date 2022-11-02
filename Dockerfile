@@ -50,6 +50,7 @@ COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY ./nginx/mime.types /etc/nginx/mime.types
 COPY ./nginx/index.html /app/static/index.html
+COPY ./nginx/volt.png /app/static/volt.png
 COPY ./volts-front/assets/tailwind.css /app/static/main.css
 
 # Get compiled binaries from builder's cargo install directory
