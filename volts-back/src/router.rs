@@ -37,6 +37,7 @@ pub fn build_router() -> Router<AppState> {
             put(plugin::unyank),
         )
         .route("/api/v1/plugins", get(plugin::search))
+        .route("/api/v1/plugins/:author/:name/:version", get(plugin::meta))
         .route(
             "/api/v1/plugins/:author/:name/:version/download",
             get(plugin::download),

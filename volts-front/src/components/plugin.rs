@@ -59,9 +59,10 @@ fn PluginItem<'a, G: Html>(
     plugin: IndexedPlugin,
     plugins: &'a Signal<Vec<IndexedPlugin>>,
 ) -> View<G> {
-    let author = plugin.plugin.author.clone();
-    let name = plugin.plugin.name.clone();
+    let author = create_signal(cx, plugin.plugin.author.clone());
+    let name = create_signal(cx, plugin.plugin.name.clone());
     let version = plugin.plugin.version.clone();
+    let updated_at = plugin.plugin.updated_at_ts;
 
     let handle_img_error = move |event: Event| {
         let target: web_sys::HtmlImageElement = event.target().unwrap().unchecked_into();
@@ -72,35 +73,37 @@ fn PluginItem<'a, G: Html>(
     };
     view! {cx,
         div(class="py-3") {
-            li(
-                class="flex border rounded-md py-4 w-full"
-            ) {
-                img(
-                    class="m-4 h-auto w-16",
-                    src=format!("/api/v1/plugins/{}/{}/{}/icon", author, name, version),
-                    on:error=handle_img_error,
-                ) {}
-                div(class="flex flex-col justify-between w-[calc(100%-6rem)] pr-4") {
-                    div {
-                        p(
-                            class="font-bold"
+            a(href=format!("/plugins/{}/{}", author.get(), name.get())) {
+                li(
+                    class="flex border rounded-md py-4 w-full"
+                ) {
+                    img(
+                        class="m-4 h-16 w-16",
+                        src=format!("/api/v1/plugins/{}/{}/{}/icon?id={}", author.get(), name.get(), version, updated_at),
+                        on:error=handle_img_error,
+                    ) {}
+                    div(class="flex flex-col justify-between w-[calc(100%-6rem)] pr-4") {
+                        div {
+                            p(
+                                class="font-bold"
+                            ) {
+                                (plugin.plugin.display_name)
+                            }
+                            p(
+                                class="mt-1 text-ellipsis whitespace-nowrap overflow-hidden"
+                            ) {
+                                (plugin.plugin.description)
+                            }
+                        }
+                        div(
+                            class="flex justify-between text-sm text-gray-400 mt-3"
                         ) {
-                            (plugin.plugin.display_name)
-                        }
-                        p(
-                            class="mt-1 text-ellipsis whitespace-nowrap overflow-hidden"
-                        ) {
-                            (plugin.plugin.description)
-                        }
-                    }
-                    div(
-                        class="flex justify-between text-sm text-gray-400 mt-3"
-                    ) {
-                        p {
-                            (plugin.plugin.author)
-                        }
-                        p {
-                            "Downloads: " (plugin.plugin.downloads)
+                            p {
+                                (plugin.plugin.author)
+                            }
+                            p {
+                                "Downloads: " (plugin.plugin.downloads)
+                            }
                         }
                     }
                 }
@@ -169,5 +172,144 @@ pub fn PluginList<G: Html>(cx: Scope) -> View<G> {
                 }
             }
         }
+    }
+}
+
+#[component(inline_props)]
+pub fn PluginView<G: Html>(cx: Scope, author: String, name: String) -> View<G> {
+    let plugin = create_signal(cx, None);
+
+    let req = Request::get(&format!("/api/v1/plugins/{author}/{name}/latest")).send();
+    sycamore::futures::spawn_local_scoped(cx, async move {
+        let resp = req.await.unwrap();
+        let resp: EncodePlugin = resp.json().await.unwrap();
+        plugin.set(Some(resp));
+    });
+
+    let handle_img_error = move |event: Event| {
+        let target: web_sys::HtmlImageElement = event.target().unwrap().unchecked_into();
+        if target.src().ends_with("volt.png") {
+            return;
+        }
+        target.set_src("/static/volt.png");
+    };
+
+    view! {cx,
+        (if plugin.get().is_none() {
+            view! {cx,
+            }
+        } else {
+            view! {cx,
+                div(class="container m-auto mt-10") {
+                    div(class="flex") {
+                        img(
+                            class="m-8 mt-2 h-24 w-24",
+                            src=format!("/api/v1/plugins/{}/{}/{}/icon?id={}",
+                                (*plugin.get()).as_ref().unwrap().author,
+                                (*plugin.get()).as_ref().unwrap().name,
+                                (*plugin.get()).as_ref().unwrap().version,
+                                (*plugin.get()).as_ref().unwrap().updated_at_ts),
+                            on:error=handle_img_error,
+                        ) {}
+                        div(
+                            class="w-[calc(100%-10rem)]"
+                        ) {
+                            div(class="flex items-baseline") {
+                                p(class="text-4xl font-bold") {
+                                    ((*plugin.get()).as_ref().unwrap().display_name)
+                                }
+                                p(class="ml-4 px-2 rounded-md border bg-gray-200") {
+                                    "v"((*plugin.get()).as_ref().unwrap().version)
+                                }
+                            }
+                            p(class="text-lg mt-1") {
+                                ((*plugin.get()).as_ref().unwrap().description)
+                            }
+                            div(class="flex mt-4 flex-wrap") {
+                                p {
+                                    ((*plugin.get()).as_ref().unwrap().author)
+                                }
+                                p(class="ml-4") {
+                                    "｜"
+                                }
+                                p(class="ml-4") {
+                                    ((*plugin.get()).as_ref().unwrap().downloads) " Dowloads"
+                                }
+                            }
+                        }
+                    }
+                    hr(class="my-8 h-px bg-gray-200 border-0") {}
+                    div(class="flex flex-wrap") {
+                        div(class="w-full lg:w-2/3 px-10") {
+                            p {
+                                "No readme"
+                            }
+                        }
+                        div(class="w-full lg:w-1/3 px-4") {
+                            p(class="font-bold") {
+                                "Repository"
+                            }
+                            div(class="mt-2") {
+                                (if (*plugin.get()).as_ref().unwrap().repository.is_none() {
+                                    view!{cx, p {""}}
+                                } else {
+                                    view!{cx,
+                                        a(
+                                            class="text-blue-500 hover:text-blue-700",
+                                            target="_blank",
+                                            href=(*plugin.get()).as_ref().unwrap().repository.clone().unwrap(),
+                                        ) {
+                                            ((*plugin.get()).as_ref().unwrap().repository.clone().unwrap())
+                                        }
+                                    }
+                                })
+                            }
+
+                            p(class="font-bold mt-8") {
+                                "More Information"
+                            }
+                            p(class="mt-2") {
+                                table(class="table-auto") {
+                                    tbody {
+                                        tr {
+                                            td {
+                                                "Version"
+                                            }
+                                            td {
+                                                ((*plugin.get()).as_ref().unwrap().version)
+                                            }
+                                        }
+                                        tr {
+                                            td {
+                                                "Author"
+                                            }
+                                            td {
+                                                ((*plugin.get()).as_ref().unwrap().author)
+                                            }
+                                        }
+                                        tr {
+                                            td(class="pr-4") {
+                                                "Released"
+                                            }
+                                            td {
+                                                ((*plugin.get()).as_ref().unwrap().released_at)
+                                            }
+                                        }
+                                        tr {
+                                            td(class="pr-4") {
+                                                "Last Updated"
+                                            }
+                                            td {
+                                                ((*plugin.get()).as_ref().unwrap().updated_at)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        })
     }
 }

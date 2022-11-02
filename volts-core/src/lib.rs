@@ -44,7 +44,9 @@ pub struct EncodePlugin {
     pub description: String,
     pub downloads: i32,
     pub repository: Option<String>,
-    pub updated_at: NaiveDateTime,
+    pub updated_at_ts: i64,
+    pub updated_at: String,
+    pub released_at: String,
 }
 
 #[derive(Serialize, Deserialize)]

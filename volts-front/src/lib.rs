@@ -1,6 +1,10 @@
 pub(crate) mod components;
 
-use components::{navbar::Navbar, plugin::PluginList, token::TokenList};
+use components::{
+    navbar::Navbar,
+    plugin::{PluginList, PluginView},
+    token::TokenList,
+};
 use gloo_net::http::Request;
 use sycamore::{
     component,
@@ -19,6 +23,8 @@ enum AppRoutes {
     Index,
     #[to("/account")]
     Account,
+    #[to("/plugins/<author>/<name>")]
+    Plugin { author: String, name: String },
     #[not_found]
     NotFound,
 }
@@ -73,6 +79,9 @@ pub fn start_front() {
                                 },
                                 AppRoutes::Account => view! {cx,
                                     Account
+                                },
+                                AppRoutes::Plugin { author, name } => view! {cx,
+                                    PluginView(author=author.clone(), name=name.clone())
                                 },
                                 AppRoutes::NotFound => view! {cx,
                                     p(class="text-lg") {

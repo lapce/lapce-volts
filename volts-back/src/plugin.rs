@@ -107,23 +107,26 @@ pub async fn search(
 
     let versions = versions.grouped_by(&plugins).into_iter().map(|versions| {
         versions
-            .iter()
-            .filter_map(|v| semver::Version::parse(&v.num).ok())
-            .max()
+            .into_iter()
+            .filter_map(|v| Some((semver::Version::parse(&v.num).ok()?, v)))
+            .max_by_key(|(v, _)| v.clone())
     });
 
     let plugins: Vec<EncodePlugin> = versions
         .zip(data)
         .filter_map(|(v, (p, u))| {
+            let version = v?.1;
             Some(EncodePlugin {
                 name: p.name,
                 author: u.gh_login,
-                version: v?.to_string(),
+                version: version.num,
                 display_name: p.display_name,
                 description: p.description,
                 downloads: p.downloads,
                 repository: p.repository,
-                updated_at: p.updated_at,
+                updated_at_ts: p.updated_at.timestamp(),
+                updated_at: p.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                released_at: version.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
             })
         })
         .collect();
@@ -133,6 +136,52 @@ pub async fn search(
         limit,
         page,
         plugins,
+    })
+}
+
+pub async fn meta(
+    State(bucket): State<Bucket>,
+    State(db_pool): State<DbPool>,
+    Path((author, name, version)): Path<(String, String, String)>,
+) -> impl IntoResponse {
+    let mut conn = db_pool.read.get().await.unwrap();
+    let user = find_user_by_gh_login(&mut conn, &author).await.unwrap();
+    let name = name.to_lowercase();
+    let plugin = find_plugin(&mut conn, &user, &name).await.unwrap();
+
+    let version = if version == "latest" {
+        let versions: Vec<Version> = Version::belonging_to(&plugin)
+            .filter(versions::yanked.eq(false))
+            .load(&mut conn)
+            .await
+            .unwrap();
+
+        let max = versions
+            .into_iter()
+            .filter_map(|v| {
+                semver::Version::parse(&v.num)
+                    .ok()
+                    .map(|version| (v, version))
+            })
+            .max_by_key(|(_, version)| version.clone());
+        max.unwrap().0
+    } else {
+        find_plugin_version(&mut conn, &plugin, &version)
+            .await
+            .unwrap()
+    };
+
+    Json(EncodePlugin {
+        name,
+        author,
+        version: version.num,
+        display_name: plugin.display_name,
+        description: plugin.description,
+        downloads: plugin.downloads,
+        repository: plugin.repository,
+        updated_at_ts: plugin.updated_at.timestamp(),
+        updated_at: plugin.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+        released_at: version.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
     })
 }
 
@@ -252,6 +301,10 @@ pub async fn icon(
         )
         .unwrap(),
     );
+    res.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::header::HeaderValue::from_static("public, max-age=86400"),
+    );
     res
 }
 
@@ -308,6 +361,10 @@ pub async fn publish(
         }
         Err(_) => return (StatusCode::BAD_REQUEST, "volt.tmol format invalid").into_response(),
     };
+
+    if semver::Version::parse(&volt.version).is_err() {
+        return (StatusCode::BAD_REQUEST, "version isn't valid").into_response();
+    }
 
     {
         let dest_volt_path = dest.path().join("volt.toml");
