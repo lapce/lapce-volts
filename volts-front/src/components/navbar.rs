@@ -51,7 +51,7 @@ pub fn Navbar<G: Html>(cx: Scope) -> View<G> {
         div(class="relative bg-coolGray-50 overflow-hidden",
             style="background-image: linear-gradient(to right top, #4264af, #4f70ba, #5b7dc4, #688acf, #7597d9, #6ca0e0, #63a9e6, #5ab2eb, #2eb9e7, #00bfdd, #00c3cd, #10c6ba);"
         ) {
-            nav(class="flex flex-wrap items-center justify-between container m-auto py-6 px-0") {
+            nav(class="flex flex-wrap items-center justify-between container m-auto py-6 px-3") {
                 div(class="flex items-center"){
                     a(
                         class="flex items-center",

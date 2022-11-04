@@ -2,7 +2,7 @@ pub(crate) mod components;
 
 use components::{
     navbar::Navbar,
-    plugin::{PluginList, PluginView},
+    plugin::{PluginList, PluginSearch, PluginSearchIndex, PluginView},
     token::TokenList,
 };
 use gloo_net::http::Request;
@@ -25,6 +25,10 @@ enum AppRoutes {
     Account,
     #[to("/plugins/<author>/<name>")]
     Plugin { author: String, name: String },
+    #[to("/search/<query>")]
+    Search { query: String },
+    #[to("/search")]
+    SearchIndex,
     #[not_found]
     NotFound,
 }
@@ -82,6 +86,12 @@ pub fn start_front() {
                                 },
                                 AppRoutes::Plugin { author, name } => view! {cx,
                                     PluginView(author=author.clone(), name=name.clone())
+                                },
+                                AppRoutes::Search { query } => view! {cx,
+                                    PluginSearch(query=query.clone())
+                                },
+                                AppRoutes::SearchIndex => view! { cx,
+                                    PluginSearchIndex
                                 },
                                 AppRoutes::NotFound => view! {cx,
                                     p(class="text-lg") {

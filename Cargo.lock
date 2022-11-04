@@ -765,6 +765,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "getopts"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1105,21 +1114,6 @@ dependencies = [
  "parking_lot 0.11.2",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "lapce-rpc"
-version = "0.2.1"
-source = "git+https://github.com/lapce/lapce#4f162c2a40317e3df687b6600451445fce309355"
-dependencies = [
- "anyhow",
- "crossbeam-channel",
- "log",
- "lsp-types",
- "parking_lot 0.11.2",
- "serde",
- "serde_json",
- "xi-rope",
 ]
 
 [[package]]
@@ -1622,6 +1616,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ea3d908b0e36316caf9e9e2c4625cdde190a7e6f440d794667ed17a1855e725"
 dependencies = [
  "unicode-ident",
+]
+
+[[package]]
+name = "pulldown-cmark"
+version = "0.9.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d9cc634bc78768157b5cbfe988ffcd1dcba95cd2b2f03a88316c08c6d00ed63"
+dependencies = [
+ "bitflags",
+ "getopts",
+ "memchr",
+ "unicase",
 ]
 
 [[package]]
@@ -2546,6 +2552,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
+name = "unicase"
+version = "2.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50f37be617794602aabbeee0be4f259dc1778fabe05e2d67ee8f79326d5cb4f6"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "unicode-bidi"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2625,7 +2640,7 @@ name = "volts"
 version = "0.1.0"
 dependencies = [
  "flate2",
- "lapce-rpc 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lapce-rpc",
  "reqwest",
  "serde",
  "tar",
@@ -2647,7 +2662,7 @@ dependencies = [
  "flate2",
  "futures",
  "headers",
- "lapce-rpc 0.2.1 (git+https://github.com/lapce/lapce)",
+ "lapce-rpc",
  "oauth2",
  "rand",
  "reqwest",
@@ -2682,6 +2697,7 @@ dependencies = [
  "console_error_panic_hook",
  "gloo-net",
  "gloo-timers",
+ "pulldown-cmark",
  "sycamore",
  "sycamore-router",
  "url",
@@ -2963,18 +2979,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d1526bbe5aaeb5eb06885f4d987bcdfa5e23187055de9b83fe00156a821fabc"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "xi-rope"
-version = "0.3.0"
-source = "git+https://github.com/lapce/xi-editor#06816cc92e97996c12ec048aa9190b4efc00d1a6"
-dependencies = [
- "bytecount",
- "memchr",
- "regex",
- "serde",
- "unicode-segmentation",
 ]
 
 [[package]]

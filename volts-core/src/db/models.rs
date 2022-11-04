@@ -43,6 +43,7 @@ pub struct Plugin {
     pub description: String,
     pub downloads: i32,
     pub repository: Option<String>,
+    pub wasm: bool,
 }
 
 #[derive(Queryable, Debug, Identifiable, Associations)]

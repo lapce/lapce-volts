@@ -155,17 +155,28 @@ pub struct NewPlugin<'a> {
     pub user_id: i32,
     pub display_name: &'a str,
     pub description: &'a str,
+    pub repository: Option<&'a str>,
     pub downloads: i32,
+    pub wasm: bool,
 }
 
 impl<'a> NewPlugin<'a> {
-    pub fn new(name: &'a str, user_id: i32, display_name: &'a str, description: &'a str) -> Self {
+    pub fn new(
+        name: &'a str,
+        user_id: i32,
+        display_name: &'a str,
+        description: &'a str,
+        repository: Option<&'a str>,
+        wasm: bool,
+    ) -> Self {
         NewPlugin {
             name,
             user_id,
             display_name,
             description,
             downloads: 0,
+            repository,
+            wasm,
         }
     }
 
@@ -180,6 +191,8 @@ impl<'a> NewPlugin<'a> {
             .set((
                 display_name.eq(excluded(display_name)),
                 description.eq(excluded(description)),
+                repository.eq(excluded(repository)),
+                wasm.eq(excluded(wasm)),
                 updated_at.eq(chrono::Utc::now().naive_utc()),
             ))
             .get_result(conn)

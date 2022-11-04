@@ -52,7 +52,7 @@ pub struct SearchQuery {
     q: Option<String>,
     sort: Option<String>,
     limit: Option<usize>,
-    page: Option<usize>,
+    offset: Option<usize>,
 }
 
 pub async fn search(
@@ -60,11 +60,11 @@ pub async fn search(
     State(db_pool): State<DbPool>,
 ) -> impl IntoResponse {
     let limit = query.limit.unwrap_or(10).min(100);
-    let page = query.page.unwrap_or(0);
-    let offset = page * limit;
+    let offset = query.offset.unwrap_or(0);
     let mut conn = db_pool.read.get().await.unwrap();
     let mut sql_query = plugins::table.inner_join(users::dsl::users).into_boxed();
     let mut total: i64 = 0;
+    let mut had_query = false;
     if let Some(q) = query.q.as_ref() {
         if !q.is_empty() {
             let q = format!("%{q}%");
@@ -74,6 +74,7 @@ pub async fn search(
                 .or(plugins::description.ilike(q));
             sql_query = sql_query.filter(filter.clone());
 
+            had_query = true;
             total = plugins::table
                 .filter(filter)
                 .count()
@@ -81,6 +82,9 @@ pub async fn search(
                 .await
                 .unwrap();
         }
+    }
+    if !had_query {
+        total = plugins::table.count().get_result(&mut conn).await.unwrap();
     }
 
     sql_query = sql_query.offset(offset as i64).limit(limit as i64);
@@ -117,6 +121,7 @@ pub async fn search(
         .filter_map(|(v, (p, u))| {
             let version = v?.1;
             Some(EncodePlugin {
+                id: p.id,
                 name: p.name,
                 author: u.gh_login,
                 version: version.num,
@@ -127,6 +132,7 @@ pub async fn search(
                 updated_at_ts: p.updated_at.timestamp(),
                 updated_at: p.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
                 released_at: version.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+                wasm: p.wasm,
             })
         })
         .collect();
@@ -134,7 +140,7 @@ pub async fn search(
     Json(PluginList {
         total,
         limit,
-        page,
+        offset,
         plugins,
     })
 }
@@ -172,6 +178,7 @@ pub async fn meta(
     };
 
     Json(EncodePlugin {
+        id: plugin.id,
         name,
         author,
         version: version.num,
@@ -182,6 +189,7 @@ pub async fn meta(
         updated_at_ts: plugin.updated_at.timestamp(),
         updated_at: plugin.updated_at.format("%Y-%m-%d %H:%M:%S").to_string(),
         released_at: version.created_at.format("%Y-%m-%d %H:%M:%S").to_string(),
+        wasm: plugin.wasm,
     })
 }
 
@@ -378,6 +386,7 @@ pub async fn publish(
 
     let s3_folder = format!("{}/{}/{}", user.gh_login, volt.name, volt.version);
 
+    let mut is_wasm = false;
     if let Some(wasm) = volt.wasm.as_ref() {
         let wasm_path = dir.path().join(wasm);
         if !wasm_path.exists() {
@@ -389,6 +398,7 @@ pub async fn publish(
             .await
             .unwrap();
         tokio::fs::copy(wasm_path, dest_wasm).await.unwrap();
+        is_wasm = true;
     } else if let Some(themes) = volt.color_themes.as_ref() {
         if themes.is_empty() {
             return (StatusCode::BAD_REQUEST, "no color theme provided").into_response();
@@ -545,8 +555,14 @@ pub async fn publish(
         .build_transaction()
         .run(|conn| {
             async move {
-                let new_plugin =
-                    NewPlugin::new(&volt.name, user.id, &volt.display_name, &volt.description);
+                let new_plugin = NewPlugin::new(
+                    &volt.name,
+                    user.id,
+                    &volt.display_name,
+                    &volt.description,
+                    volt.repository.as_deref(),
+                    is_wasm,
+                );
                 let plugin = new_plugin.create_or_update(conn).await?;
                 let new_version = NewVersion::new(plugin.id, &volt.version);
                 new_version.create_or_update(conn).await?;

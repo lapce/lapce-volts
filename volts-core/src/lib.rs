@@ -37,6 +37,7 @@ pub struct NewTokenPayload {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct EncodePlugin {
+    pub id: i32,
     pub name: String,
     pub author: String,
     pub version: String,
@@ -47,12 +48,13 @@ pub struct EncodePlugin {
     pub updated_at_ts: i64,
     pub updated_at: String,
     pub released_at: String,
+    pub wasm: bool,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct PluginList {
     pub total: i64,
     pub limit: usize,
-    pub page: usize,
+    pub offset: usize,
     pub plugins: Vec<EncodePlugin>,
 }

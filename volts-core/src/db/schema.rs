@@ -23,6 +23,7 @@ diesel::table! {
         description -> Varchar,
         downloads -> Int4,
         repository -> Nullable<Varchar>,
+        wasm -> Bool,
     }
 }
 

@@ -166,7 +166,7 @@ pub fn TokenList<G: Html>(cx: Scope) -> View<G> {
             view! {cx, }
         } else {
             view! {cx,
-                div(class="container m-auto") {
+                div(class="container m-auto px-3") {
                     div(class="mt-5") {
                         h1(class="flex justify-between") {
                             span { "API Tokens" }
