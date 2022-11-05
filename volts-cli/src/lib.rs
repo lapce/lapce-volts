@@ -97,8 +97,8 @@ fn publish(cli: &Cli) {
         let s = std::fs::read_to_string(&volt_path).unwrap();
         let volt: VoltMetadata = match toml::from_str(&s) {
             Ok(volt) => volt,
-            Err(_) => {
-                eprintln!("volt.tmol format invalid");
+            Err(e) => {
+                eprintln!("volt.toml format invalid: {e}");
                 return;
             }
         };
