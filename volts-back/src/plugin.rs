@@ -62,7 +62,14 @@ pub async fn search(
     let limit = query.limit.unwrap_or(10).min(100);
     let offset = query.offset.unwrap_or(0);
     let mut conn = db_pool.read.get().await.unwrap();
-    let mut sql_query = plugins::table.inner_join(users::dsl::users).into_boxed();
+    let mut sql_query = plugins::table
+        .inner_join(users::dsl::users)
+        .filter(diesel::expression::exists::exists(
+            versions::table
+                .filter(versions::plugin_id.eq(plugins::id))
+                .filter(versions::yanked.eq(false)),
+        ))
+        .into_boxed();
     let mut total: i64 = 0;
     let mut had_query = false;
     if let Some(q) = query.q.as_ref() {
@@ -71,12 +78,18 @@ pub async fn search(
 
             let filter = plugins::name
                 .ilike(q.clone())
-                .or(plugins::description.ilike(q));
+                .or(plugins::description.ilike(q.clone()))
+                .or(plugins::display_name.ilike(q));
             sql_query = sql_query.filter(filter.clone());
 
             had_query = true;
             total = plugins::table
                 .filter(filter)
+                .filter(diesel::expression::exists::exists(
+                    versions::table
+                        .filter(versions::plugin_id.eq(plugins::id))
+                        .filter(versions::yanked.eq(false)),
+                ))
                 .count()
                 .get_result(&mut conn)
                 .await
@@ -84,7 +97,16 @@ pub async fn search(
         }
     }
     if !had_query {
-        total = plugins::table.count().get_result(&mut conn).await.unwrap();
+        total = plugins::table
+            .filter(diesel::expression::exists::exists(
+                versions::table
+                    .filter(versions::plugin_id.eq(plugins::id))
+                    .filter(versions::yanked.eq(false)),
+            ))
+            .count()
+            .get_result(&mut conn)
+            .await
+            .unwrap();
     }
 
     sql_query = sql_query.offset(offset as i64).limit(limit as i64);
