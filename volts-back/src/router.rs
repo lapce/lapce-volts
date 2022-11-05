@@ -22,34 +22,37 @@ use crate::{
 
 pub fn build_router() -> Router<AppState> {
     let state = AppState::new();
-    Router::with_state(state)
-        .route("/api/private/session", get(new_session))
-        .route("/api/private/session/authorize", get(session_authorize))
-        .route("/api/private/session", delete(logout))
-        .route("/api/v1/me", get(me))
-        .route("/api/v1/me/tokens", get(token::list))
-        .route("/api/v1/me/tokens", post(token::new))
-        .route("/api/v1/me/tokens/:id", delete(token::revoke))
-        .route("/api/v1/me/plugins/new", put(plugin::publish))
-        .route("/api/v1/me/plugins/:name/:version/yank", put(plugin::yank))
-        .route(
-            "/api/v1/me/plugins/:name/:version/unyank",
-            put(plugin::unyank),
-        )
-        .route("/api/v1/plugins", get(plugin::search))
-        .route("/api/v1/plugins/:author/:name/:version", get(plugin::meta))
-        .route(
-            "/api/v1/plugins/:author/:name/:version/download",
-            get(plugin::download),
-        )
-        .route(
-            "/api/v1/plugins/:author/:name/:version/readme",
-            get(plugin::readme),
-        )
-        .route(
-            "/api/v1/plugins/:author/:name/:version/icon",
-            get(plugin::icon),
-        )
+
+    let private_routes = Router::with_state(state.clone())
+        .route("/session", get(new_session))
+        .route("/session", delete(logout))
+        .route("/session/authorize", get(session_authorize));
+
+    let user_routes = Router::with_state(state.clone())
+        .route("/", get(me))
+        .route("/tokens", get(token::list))
+        .route("/tokens", post(token::new))
+        .route("/tokens/:id", delete(token::revoke));
+
+    let plugins_routes = Router::with_state(state.clone())
+        .route("/", get(plugin::search))
+        .route("/new", put(plugin::publish))
+        .route("/:name/:version/yank", post(plugin::yank))
+        .route("/:name/:version/unyank", post(plugin::unyank))
+        .route("/:author/:name/:version", get(plugin::meta))
+        .route("/:author/:name/:version/download", get(plugin::download))
+        .route("/:author/:name/:version/readme", get(plugin::readme))
+        .route("/:author/:name/:version/icon", get(plugin::icon));
+
+    let v1 = Router::with_state(state.clone())
+        .nest("/me", user_routes)
+        .nest("/plugins", plugins_routes);
+
+    let api = Router::with_state(state.clone())
+        .nest("/private", private_routes)
+        .nest("/v1", v1);
+
+    Router::with_state(state).nest("/api", api)
 }
 
 async fn me(

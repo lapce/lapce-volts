@@ -3,6 +3,10 @@ use oauth2::AccessToken;
 use reqwest::{header, Client};
 use serde::{de::DeserializeOwned, Deserialize};
 
+const GITHUB_API_ENDPOINT: &str = "https://api.github.com";
+
+const VOLTS_USER_AGENT: &str = "volts (https://plugins.lapce.dev)";
+
 #[derive(Debug, Deserialize)]
 pub struct GithubUser {
     pub avatar_url: Option<String>,
@@ -28,7 +32,7 @@ impl GithubClient {
     pub fn new() -> Self {
         let client = reqwest::Client::new();
         Self {
-            base_url: "https://api.github.com".to_string(),
+            base_url: GITHUB_API_ENDPOINT.to_string(),
             client,
         }
     }
@@ -45,7 +49,7 @@ impl GithubClient {
             .get(&url)
             .header(header::ACCEPT, "application/vnd.github.v3+json")
             .header(header::AUTHORIZATION, format!("token {}", auth.secret()))
-            .header(header::USER_AGENT, "crates.io (https://crates.io)")
+            .header(header::USER_AGENT, VOLTS_USER_AGENT)
             .send()
             .await?
             .json()

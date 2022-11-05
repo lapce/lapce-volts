@@ -9,7 +9,6 @@ edition = "2021"
 semver = "1.0.14"
 rust-s3 = { version = "0.32.3", features = ["with-tokio"] }
 tempfile = "3.3.0"
-flate2 = "1.0.24"
 tar = "0.4.38"
 sha2 = "0.10.6"
 rand = "0.8.5"
@@ -31,3 +30,4 @@ dotenvy = "0.15.6"
 volts-core = { path = "../volts-core" }
 toml_edit = { version = "0.14.4", features = ["easy"] }
 lapce-rpc = "0.2.1"
+zstd = { version = "0.11" }
