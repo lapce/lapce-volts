@@ -4,6 +4,7 @@ use std::{
     path::PathBuf,
 };
 
+use clap::{Parser, Subcommand};
 use flate2::{write::GzEncoder, Compression};
 use lapce_rpc::plugin::VoltMetadata;
 use reqwest::{Method, StatusCode};
@@ -24,10 +25,60 @@ struct IconThemeConfig {
     pub extension: HashMap<String, String>,
 }
 
-pub fn publish() {
-    println!("please paste the API Token you created on https://plugins.lapce.dev/");
-    let mut token = String::new();
-    stdin().read_line(&mut token).unwrap();
+#[derive(Parser)]
+#[clap(version, name = "Volts")]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+
+    /// Registry API authentication token
+    #[clap(long, action)]
+    token: Option<String>,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Publish plugin to registry
+    Publish {},
+}
+
+pub fn cli() {
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Commands::Publish {} => publish(&cli),
+    }
+}
+
+fn publish(cli: &Cli) {
+    let api_credential = keyring::Entry::new("lapce-volts", "registry-api");
+
+    let token = if cli.token.is_none() && api_credential.get_password().is_err() {
+        println!("Please paste the API Token you created on https://plugins.lapce.dev/");
+        let mut token = String::new();
+        stdin().read_line(&mut token).unwrap();
+
+        token = token.trim().to_string();
+        if token.is_empty() {
+            eprintln!("Token cannot be empty");
+            std::process::exit(1);
+        }
+
+        if let Err(why) = api_credential.set_password(&token) {
+            eprintln!("Failed to save token in system credential store: {why}");
+        };
+
+        token
+    } else if let Some(token) = &cli.token {
+        if api_credential.get_password().is_err() {
+            if let Err(why) = api_credential.set_password(token) {
+                eprintln!("Failed to save token in system credential store: {why}");
+            };
+        }
+        token.to_owned()
+    } else {
+        api_credential.get_password().unwrap()
+    };
 
     let temp_dir = tempfile::tempdir().unwrap();
     let tar_gz_path = temp_dir.path().join("volt.tar.gz");
@@ -46,8 +97,8 @@ pub fn publish() {
         let s = std::fs::read_to_string(&volt_path).unwrap();
         let volt: VoltMetadata = match toml::from_str(&s) {
             Ok(volt) => volt,
-            Err(_) => {
-                eprintln!("volt.tmol format invalid");
+            Err(e) => {
+                eprintln!("volt.toml format invalid: {e}");
                 return;
             }
         };

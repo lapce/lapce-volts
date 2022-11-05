@@ -1,3 +1,3 @@
 pub fn main() {
-    volts::publish();
+    volts::cli();
 }
