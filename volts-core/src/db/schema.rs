@@ -52,9 +52,4 @@ diesel::joinable!(api_tokens -> users (user_id));
 diesel::joinable!(plugins -> users (user_id));
 diesel::joinable!(versions -> plugins (plugin_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    api_tokens,
-    plugins,
-    users,
-    versions,
-);
+diesel::allow_tables_to_appear_in_same_query!(api_tokens, plugins, users, versions,);

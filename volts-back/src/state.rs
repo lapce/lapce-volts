@@ -7,8 +7,12 @@ use s3::{creds::Credentials, Bucket, Region};
 
 use crate::{db::DbPool, github::GithubClient};
 
+const GITHUB_OAUTH_AUTHORIZE_ENDPOINT: &str = "https://github.com/login/oauth/authorize";
+const GITHUB_OAUTH_TOKEN_ENDPOINT: &str = "https://github.com/login/oauth/access_token";
+
 pub const SESSION_COOKIE_NAME: &str = "session";
 
+#[derive(Clone)]
 pub struct AppState {
     store: MemoryStore,
     /// The GitHub OAuth2 configuration
@@ -64,9 +68,9 @@ impl AppState {
             env::var("GITHUB_CLIENT_SECRET")
                 .expect("Missing the GITHUB_CLIENT_SECRET environment variable."),
         );
-        let auth_url = AuthUrl::new("https://github.com/login/oauth/authorize".to_string())
+        let auth_url = AuthUrl::new(GITHUB_OAUTH_AUTHORIZE_ENDPOINT.to_string())
             .expect("Invalid authorization endpoint URL");
-        let token_url = TokenUrl::new("https://github.com/login/oauth/access_token".to_string())
+        let token_url = TokenUrl::new(GITHUB_OAUTH_TOKEN_ENDPOINT.to_string())
             .expect("Invalid token endpoint URL");
 
         // Set up the config for the Github OAuth2 process.

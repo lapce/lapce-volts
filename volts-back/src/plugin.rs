@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+};
 
 use anyhow::Result;
 use axum::{
@@ -11,7 +14,6 @@ use axum::{
 use diesel::{BelongingToDsl, BoolExpressionMethods, ExpressionMethods, GroupedBy};
 use diesel::{PgTextExpressionMethods, QueryDsl};
 use diesel_async::RunQueryDsl;
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use futures::{FutureExt, Stream, TryStreamExt};
 use headers::authorization::Bearer;
 use lapce_rpc::plugin::VoltMetadata;
@@ -27,11 +29,15 @@ use volts_core::{
     },
     EncodePlugin, PluginList,
 };
+use zstd::{Decoder, Encoder};
 
 use crate::db::{
     find_api_token, find_plugin, find_plugin_version, find_user, find_user_by_gh_login,
     modify_plugin_version_yank, DbPool, NewPlugin, NewVersion,
 };
+
+const VOLT_MANIFEST: &str = "volt.toml";
+const VOLT_ARCHIVE: &str = "plugin.volt";
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -241,7 +247,7 @@ pub async fn download(
             .unwrap();
     }
 
-    let s3_path = format!("{}/{}/{}/volt.tar.gz", user.gh_login, name, version.num);
+    let s3_path = format!("{}/{}/{}/{VOLT_ARCHIVE}", user.gh_login, name, version.num);
     bucket.presign_get(&s3_path, 60, None).unwrap()
 }
 
@@ -361,15 +367,15 @@ pub async fn publish(
 
     let dir = tempfile::TempDir::new().unwrap();
     let dest = tempfile::TempDir::new().unwrap();
-    let tar_gz = dir.path().join("volt.tar.gz");
-    stream_to_file(&tar_gz, body).await.unwrap();
+    let archive = dir.path().join(VOLT_ARCHIVE);
+    stream_to_file(&archive, body).await.unwrap();
 
     {
-        let tar_gz = tar_gz.clone();
+        let archive = archive.clone();
         let dir_path = dir.path().to_path_buf();
         tokio::task::spawn_blocking(move || {
-            let tar_gz = std::fs::File::open(tar_gz).unwrap();
-            let tar = GzDecoder::new(tar_gz);
+            let archive = File::open(archive).unwrap();
+            let tar = Decoder::new(archive).unwrap();
             let mut archive = Archive::new(tar);
             archive.unpack(dir_path).unwrap();
         })
@@ -377,9 +383,13 @@ pub async fn publish(
         .unwrap();
     }
 
-    let volt_path = dir.path().join("volt.toml");
+    let volt_path = dir.path().join(VOLT_MANIFEST);
     if !volt_path.exists() {
-        return (StatusCode::BAD_REQUEST, "volt.toml doens't exist").into_response();
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("{VOLT_MANIFEST} doesn't exist"),
+        )
+            .into_response();
     }
 
     let s = tokio::fs::read_to_string(&volt_path).await.unwrap();
@@ -389,7 +399,13 @@ pub async fn publish(
             volt.name = volt.name.to_lowercase();
             volt
         }
-        Err(_) => return (StatusCode::BAD_REQUEST, "volt.tmol format invalid").into_response(),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("{VOLT_MANIFEST} format invalid"),
+            )
+                .into_response()
+        }
     };
 
     if semver::Version::parse(&volt.version).is_err() {
@@ -397,7 +413,7 @@ pub async fn publish(
     }
 
     {
-        let dest_volt_path = dest.path().join("volt.toml");
+        let dest_volt_path = dest.path().join(VOLT_MANIFEST);
         tokio::fs::write(
             dest_volt_path,
             toml_edit::ser::to_string_pretty(&volt).unwrap(),
@@ -551,13 +567,13 @@ pub async fn publish(
         }
     }
 
-    let dest_tar_gz_dir = tempfile::TempDir::new().unwrap();
-    let dest_tar_gz = dest_tar_gz_dir.path().join("volt.tar.gz");
+    let tmpdir = tempfile::TempDir::new().unwrap();
+    let dest_volt_archive = tmpdir.path().join(VOLT_ARCHIVE);
     {
-        let tar_gz = dest_tar_gz.clone();
+        let volt_archive = dest_volt_archive.clone();
         tokio::task::spawn_blocking(move || {
-            let tar_gz = std::fs::File::create(tar_gz).unwrap();
-            let encoder = GzEncoder::new(tar_gz, Compression::default());
+            let volt_archive = std::fs::File::create(volt_archive).unwrap();
+            let encoder = Encoder::new(volt_archive, 0).unwrap();
             let mut tar = tar::Builder::new(encoder);
             tar.append_dir_all(".", dest.path()).unwrap();
         })
@@ -565,9 +581,9 @@ pub async fn publish(
         .unwrap();
     }
 
-    let volt_content = tokio::fs::read(&dest_tar_gz).await.unwrap();
+    let volt_content = tokio::fs::read(&dest_volt_archive).await.unwrap();
     bucket
-        .put_object(format!("{}/volt.tar.gz", s3_folder), &volt_content)
+        .put_object(format!("{s3_folder}/{VOLT_ARCHIVE}"), &volt_content)
         .await
         .unwrap();
 
@@ -608,8 +624,8 @@ where
     let body_reader = StreamReader::new(body_with_io_error);
     futures::pin_mut!(body_reader);
 
-    let mut tar_gz = tokio::fs::File::create(path).await?;
-    tokio::io::copy(&mut body_reader, &mut tar_gz).await?;
+    let mut archive = tokio::fs::File::create(path).await?;
+    tokio::io::copy(&mut body_reader, &mut archive).await?;
     Ok(())
 }
 

@@ -18,7 +18,7 @@ name = "volts"
 path = "volts-cli/src/bin/volts.rs"
 
 [workspace]
-memebers = [
+members = [
   "volts-core",
   "volts-front",
   "volts-back",
