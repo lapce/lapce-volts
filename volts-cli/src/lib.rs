@@ -1,9 +1,12 @@
 mod commands;
 
-use std::{collections::HashMap, io::stdin};
+use std::{collections::HashMap, io::stdin, ops::Deref};
 
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
+use lapce_rpc::plugin::VoltMetadata;
 use serde::{Deserialize, Serialize};
+use toml_edit::easy as toml;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -35,19 +38,71 @@ enum Commands {
     /// Publish plugin to registry
     Publish {},
     /// Yank version from registry
-    Yank { name: String, version: String },
+    Yank {
+        author: Option<String>,
+        name: Option<String>,
+        version: String,
+    },
     /// Undo yanking version from registry
-    Unyank { name: String, version: String },
+    Unyank {
+        author: Option<String>,
+        name: Option<String>,
+        version: String,
+    },
 }
 
 pub fn cli() {
     let cli = Cli::parse();
 
-    match &cli.command {
+    if let Err(e) = match &cli.command {
         Commands::Publish {} => commands::publish(&cli),
-        Commands::Yank { name, version } => commands::yank(&cli, name, version),
-        Commands::Unyank { name, version } => commands::unyank(&cli, name, version),
+        Commands::Yank {
+            author,
+            name,
+            version,
+        } => {
+            if author.is_none() || name.is_none() {
+                let volt = read_volt();
+                commands::yank(&cli, volt.author, volt.name, version)
+            } else {
+                commands::yank(&cli, &author.unwrap(), &name.unwrap(), version)
+            }
+        },
+        Commands::Unyank {
+            author,
+            name,
+            version,
+        } => commands::unyank(&cli, author, name, version),
+    } {
+        eprintln!("Error: {e}");
+        std::process::exit(1);
     }
+}
+
+const VOLT_MANIFEST: &str = "volt.toml";
+
+fn read_volt() -> Result<VoltMetadata> {
+    let workdir = std::env::current_dir()?;
+    let volt_path = workdir.join(VOLT_MANIFEST);
+    if !volt_path.exists() {
+        return Err(anyhow!("{VOLT_MANIFEST} doesn't exist"));
+    }
+
+    let s = std::fs::read_to_string(&volt_path)?;
+    let volt = match toml::from_str::<VoltMetadata>(&s) {
+        Ok(mut volt) => {
+            volt
+        }
+        Err(_) => {
+            return Err(anyhow!("{VOLT_MANIFEST} format invalid"));
+        }
+    };
+
+    if semver::Version::parse(&volt.version).is_err() {
+        return Err(anyhow!("version isn't valid"));
+    }
+
+    Ok(volt)
 }
 
 fn auth_token(cli: &Cli) -> String {
