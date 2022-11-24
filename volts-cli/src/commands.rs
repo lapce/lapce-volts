@@ -124,7 +124,7 @@ pub(crate) fn publish(cli: &Cli) {
     }
 
     let resp = reqwest::blocking::Client::new()
-        .request(Method::PUT, "http://127.0.0.1:8080/api/v1/plugins/new")
+        .request(Method::PUT, "https://plugins.lapce.dev/api/v1/plugins/new")
         .bearer_auth(token.trim())
         .body(File::open(&archive_path).unwrap())
         .send()
@@ -143,7 +143,7 @@ pub(crate) fn yank(cli: &Cli, name: &String, version: &String) {
     let resp = reqwest::blocking::Client::new()
         .request(
             Method::PUT,
-            format!("https://plugins.lapce.dev/api/v1/me/plugins/{name}/{version}/yank"),
+            format!("https://plugins.lapce.dev/api/v1/plugins/me/{name}/{version}/yank"),
         )
         .bearer_auth(token.trim())
         .send()
@@ -161,7 +161,7 @@ pub(crate) fn unyank(cli: &Cli, name: &String, version: &String) {
     let resp = reqwest::blocking::Client::new()
         .request(
             Method::PUT,
-            format!("https://plugins.lapce.dev/api/v1/me/plugins/{name}/{version}/unyank"),
+            format!("https://plugins.lapce.dev/api/v1/plugins/me/{name}/{version}/unyank"),
         )
         .bearer_auth(token.trim())
         .send()

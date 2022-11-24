@@ -650,7 +650,7 @@ where
 pub async fn yank(
     TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
     State(db_pool): State<DbPool>,
-    Path((author, name, version)): Path<(String, String, String)>,
+    Path((name, version)): Path<(String, String)>,
 ) -> impl IntoResponse {
     let api_token = {
         let mut conn = db_pool.write.get().await.unwrap();
@@ -677,7 +677,7 @@ pub async fn yank(
 pub async fn unyank(
     TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
     State(db_pool): State<DbPool>,
-    Path((author, name, version)): Path<(String, String, String)>,
+    Path((name, version)): Path<(String, String)>,
 ) -> impl IntoResponse {
     let api_token = {
         let mut conn = db_pool.write.get().await.unwrap();
