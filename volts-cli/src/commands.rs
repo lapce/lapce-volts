@@ -20,7 +20,7 @@ pub(crate) fn publish(cli: &Cli) {
 
     {
         let archive = File::create(&archive_path).unwrap();
-        let encoder = Encoder::new(archive, 0).unwrap();
+        let encoder = Encoder::new(archive, 0).unwrap().auto_finish();
         let mut tar = Builder::new(encoder);
 
         let volt_path = PathBuf::from("volt.toml");
@@ -124,10 +124,7 @@ pub(crate) fn publish(cli: &Cli) {
     }
 
     let resp = reqwest::blocking::Client::new()
-        .request(
-            Method::PUT,
-            "https://plugins.lapce.dev/api/v1/me/plugins/new",
-        )
+        .request(Method::PUT, "http://127.0.0.1:8080/api/v1/plugins/new")
         .bearer_auth(token.trim())
         .body(File::open(&archive_path).unwrap())
         .send()

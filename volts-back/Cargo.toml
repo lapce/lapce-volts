@@ -17,7 +17,7 @@ diesel = { version = "2.0.2", features = ["postgres", "chrono"] }
 diesel-async = { version = "0.1.1", features = ["postgres", "deadpool"] }
 async-session = "3.0.0"
 headers = "0.3"
-axum = { version = "0.6.0-rc.2", features = ["headers"] }
+axum = { version = "0.6.0-rc.4", features = ["headers"] }
 reqwest = { version = "0.11.12", features = ["json"] }
 oauth2 = "4.2.3"
 anyhow = "1.0.66"

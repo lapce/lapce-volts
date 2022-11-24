@@ -38,6 +38,7 @@ use crate::db::{
 
 const VOLT_MANIFEST: &str = "volt.toml";
 const VOLT_ARCHIVE: &str = "plugin.volt";
+const OLD_VOLT_ARCHIVE: &str = "volt.tar.gz";
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -248,7 +249,20 @@ pub async fn download(
     }
 
     let s3_path = format!("{}/{}/{}/{VOLT_ARCHIVE}", user.gh_login, name, version.num);
-    bucket.presign_get(&s3_path, 60, None).unwrap()
+    if bucket
+        .head_object(&s3_path)
+        .await
+        .map(|(_, code)| code == 200)
+        .unwrap_or(false)
+    {
+        bucket.presign_get(&s3_path, 60, None).unwrap()
+    } else {
+        let old_s3_path = format!(
+            "{}/{}/{}/{OLD_VOLT_ARCHIVE}",
+            user.gh_login, name, version.num
+        );
+        bucket.presign_get(&old_s3_path, 60, None).unwrap()
+    }
 }
 
 pub async fn readme(
@@ -573,7 +587,7 @@ pub async fn publish(
         let volt_archive = dest_volt_archive.clone();
         tokio::task::spawn_blocking(move || {
             let volt_archive = std::fs::File::create(volt_archive).unwrap();
-            let encoder = Encoder::new(volt_archive, 0).unwrap();
+            let encoder = Encoder::new(volt_archive, 0).unwrap().auto_finish();
             let mut tar = tar::Builder::new(encoder);
             tar.append_dir_all(".", dest.path()).unwrap();
         })
@@ -583,7 +597,11 @@ pub async fn publish(
 
     let volt_content = tokio::fs::read(&dest_volt_archive).await.unwrap();
     bucket
-        .put_object(format!("{s3_folder}/{VOLT_ARCHIVE}"), &volt_content)
+        .put_object_with_content_type(
+            format!("{s3_folder}/{VOLT_ARCHIVE}"),
+            &volt_content,
+            "application/zstd",
+        )
         .await
         .unwrap();
 
@@ -632,7 +650,7 @@ where
 pub async fn yank(
     TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
     State(db_pool): State<DbPool>,
-    Path((name, version)): Path<(String, String)>,
+    Path((author, name, version)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
     let api_token = {
         let mut conn = db_pool.write.get().await.unwrap();
@@ -659,7 +677,7 @@ pub async fn yank(
 pub async fn unyank(
     TypedHeader(token): TypedHeader<headers::Authorization<Bearer>>,
     State(db_pool): State<DbPool>,
-    Path((name, version)): Path<(String, String)>,
+    Path((author, name, version)): Path<(String, String, String)>,
 ) -> impl IntoResponse {
     let api_token = {
         let mut conn = db_pool.write.get().await.unwrap();

@@ -51,9 +51,14 @@ pub fn cli() {
 }
 
 fn auth_token(cli: &Cli) -> String {
-    let api_credential = keyring::Entry::new("lapce-volts", "registry-api");
+    if let Some(token) = &cli.token {
+        token.to_owned()
+    } else {
+        let api_credential = keyring::Entry::new("lapce-volts", "registry-api");
+        if let Ok(token) = api_credential.get_password() {
+            return token;
+        }
 
-    return if cli.token.is_none() && api_credential.get_password().is_err() {
         println!("Please paste the API Token you created on https://plugins.lapce.dev/");
         let mut token = String::new();
         stdin().read_line(&mut token).unwrap();
@@ -69,14 +74,5 @@ fn auth_token(cli: &Cli) -> String {
         };
 
         token
-    } else if let Some(token) = &cli.token {
-        if api_credential.get_password().is_err() {
-            if let Err(why) = api_credential.set_password(token) {
-                eprintln!("Failed to save token in system credential store: {why}");
-            };
-        }
-        token.to_owned()
-    } else {
-        api_credential.get_password().unwrap()
-    };
+    }
 }
