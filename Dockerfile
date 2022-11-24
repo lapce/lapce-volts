@@ -2,10 +2,10 @@ FROM rust:latest as builder
 
 RUN cargo install wasm-pack
 
-COPY . /build
 WORKDIR /build
+COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/build/target \
+#    --mount=type=cache,target=/build/target \
     cd ./volts-front && \
     wasm-pack build --target web && \
     cd .. && \
