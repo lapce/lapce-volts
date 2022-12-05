@@ -11,7 +11,12 @@ use toml_edit::easy as toml;
 use zstd::Encoder;
 
 use crate::{auth_token, Cli, IconTheme};
-
+pub(crate) fn get_base_url() -> String {
+    std::env::var("LAPCE_PLUGIN_CLI_BASE_URL").unwrap_or_else(|_| "https://plugins.lapce.dev".into())
+}
+pub(crate) fn get_full_url(endpoint: impl Into<String>) -> String {
+    format!("{}{}", get_base_url(), endpoint.into())
+}
 pub(crate) fn publish(cli: &Cli) {
     let token = auth_token(cli);
 
@@ -124,7 +129,7 @@ pub(crate) fn publish(cli: &Cli) {
     }
 
     let resp = reqwest::blocking::Client::new()
-        .request(Method::PUT, "https://plugins.lapce.dev/api/v1/plugins/new")
+        .request(Method::PUT, get_full_url("/api/v1/plugins/new"))
         .bearer_auth(token.trim())
         .body(File::open(&archive_path).unwrap())
         .send()
@@ -143,7 +148,7 @@ pub(crate) fn yank(cli: &Cli, name: &String, version: &String) {
     let resp = reqwest::blocking::Client::new()
         .request(
             Method::PUT,
-            format!("https://plugins.lapce.dev/api/v1/plugins/me/{name}/{version}/yank"),
+            format!("{}/api/v1/plugins/me/{name}/{version}/yank", get_base_url()),
         )
         .bearer_auth(token.trim())
         .send()
@@ -161,7 +166,7 @@ pub(crate) fn unyank(cli: &Cli, name: &String, version: &String) {
     let resp = reqwest::blocking::Client::new()
         .request(
             Method::PUT,
-            format!("https://plugins.lapce.dev/api/v1/plugins/me/{name}/{version}/unyank"),
+            format!("{}/api/v1/plugins/me/{name}/{version}/unyank", get_base_url()),
         )
         .bearer_auth(token.trim())
         .send()
