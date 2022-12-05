@@ -85,8 +85,12 @@ impl AppState {
         let db_pool = crate::db::DbPool::new();
         let bucket = Bucket::new(
             "lapce-plugins",
-            Region::R2 {
-                account_id: env::var("R2_ACCOUNT_ID").unwrap(),
+            if !std::env::var("USE_MINIO").unwrap().parse::<bool>().unwrap_or_default() {
+                Region::R2 {
+                    account_id: env::var("R2_ACCOUNT_ID").unwrap(),
+                }
+            } else {
+                Region::Custom { region: "".into(), endpoint: std::env::var("MINIO_ADDRESS").unwrap() }
             },
             Credentials::from_env().unwrap(),
         )
