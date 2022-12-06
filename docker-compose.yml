@@ -1,0 +1,29 @@
+version: '3.4'
+
+services:
+  minio_dev:
+    image: minio/minio
+    ports: 
+      - 9000:9000
+      - 9001:9001
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data/
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+  postgres_dev:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: devpasswd
+      POSTGRES_DB: passwdmanager
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/data/postgres
+    restart: unless-stopped
+volumes:
+  minio_data:
+  postgres_data:

@@ -127,7 +127,7 @@ fn PluginItem<'a, G: Html>(
 #[component(inline_props)]
 fn PluginColumn<'a, G: Html>(cx: Scope<'a>, plugins: &'a Signal<Vec<IndexedPlugin>>) -> View<G> {
     view! {cx,
-        ul {
+        ul(class="border-gray-200 border-2 rounded-lg border-solid px-6 py-3 mt-4") {
             Keyed(
                 iterable=plugins,
                 view=move |cx, plugin| view! {cx,
