@@ -384,7 +384,7 @@ pub fn PluginView<G: Html>(cx: Scope, author: String, name: String) -> View<G> {
                                     "｜"
                                 }
                                 p(class="ml-4") {
-                                    ((*plugin.get()).as_ref().unwrap().downloads) " Dowloads"
+                                    ((*plugin.get()).as_ref().unwrap().downloads) " Downloads"
                                 }
                             }
                         }
