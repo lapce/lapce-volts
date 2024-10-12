@@ -5,17 +5,19 @@ RUN cargo install wasm-pack
 WORKDIR /build
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-#    --mount=type=cache,target=/build/target \
+    #    --mount=type=cache,target=/build/target \
     cd ./volts-front && \
     wasm-pack build --target web && \
     cd .. && \
     cargo build --bin volts-server --release
 
 # Runtime image
-FROM debian:bullseye
+FROM debian:bookworm
 
 RUN apt-get update
-RUN apt-get -y install postgresql-client-13
+RUN apt install -y postgresql-common
+RUN /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -i -v 14
+RUN apt-get -y install postgresql-client-14
 RUN apt-get -y install nginx
 RUN apt-get install ca-certificates -y
 RUN update-ca-certificates
